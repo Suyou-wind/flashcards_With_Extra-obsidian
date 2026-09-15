@@ -1,3 +1,7 @@
+import {
+  scopeExclusion,
+  type ScopeExclusion,
+} from "../core/config/sync-scope.js";
 import type { FlashcardsSettings } from "../core/config/settings.js";
 import { applyTextEdits } from "../core/edits/apply-text-edits.js";
 import { writebackSyncResults } from "../core/edits/writeback-sync-results.js";
@@ -60,6 +64,7 @@ export interface SyncNoteInput {
 export type SyncNoteStatus = "ok" | "skipped" | "failed";
 
 export interface SyncNoteResult {
+  scopeExclusion?: ScopeExclusion;
   /** Normalized non-cloze atomic cues used by the vault collision check. */
   atomicCues?: string[];
   /** Present only when a warm sync may safely verify this note without reading it. */
@@ -85,6 +90,18 @@ function logLints(logger: Logger, notePath: string, lints: string[]): void {
 
 /** Synchronize one Markdown note while keeping Obsidian authoritative. */
 export async function syncNote(input: SyncNoteInput): Promise<SyncNoteResult> {
+  const excluded = scopeExclusion(input.note.path, input.settings.syncScope);
+  if (excluded)
+    return {
+      scopeExclusion: excluded,
+      status: "skipped",
+      notePath: input.note.path,
+      identityWritesApplied: 0,
+      writebackEditsApplied: 0,
+      parsedCardCount: 0,
+      recoveredMissingCount: 0,
+      lints: [],
+    };
   const logger = input.logger ?? new NoopLogger();
   const trace = input.perfTrace ?? createNoopPerfTrace();
   logger.info("syncNote start", { notePath: input.note.path });

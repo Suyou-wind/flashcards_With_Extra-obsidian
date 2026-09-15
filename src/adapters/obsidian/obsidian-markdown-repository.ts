@@ -1,3 +1,7 @@
+import {
+  scopeExclusion,
+  type SyncScopeSettings,
+} from "../../core/config/sync-scope.js";
 import type { App, TFile } from "obsidian";
 import type {
   MarkdownNote,
@@ -6,10 +10,26 @@ import type {
 import type { MarkdownNoteDescriptor } from "./incremental-vault-sync.js";
 
 export class ObsidianMarkdownRepository implements MarkdownRepository {
-  constructor(private readonly app: App) {}
+  constructor(
+    private readonly app: App,
+    private readonly scope?: SyncScopeSettings,
+    private readonly targetPath?: string,
+  ) {}
+
+  private eligibleFiles(): TFile[] {
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => !scopeExclusion(file.path, this.scope));
+  }
+
+  get excludedNoteCount(): number {
+    return this.app.vault
+      .getMarkdownFiles()
+      .filter((file) => scopeExclusion(file.path, this.scope)).length;
+  }
 
   async getAllMarkdownNotes(): Promise<MarkdownNote[]> {
-    const files = this.app.vault.getMarkdownFiles();
+    const files = this.eligibleFiles();
     return Promise.all(
       files.map(async (file) => ({
         file,
@@ -21,7 +41,7 @@ export class ObsidianMarkdownRepository implements MarkdownRepository {
   }
 
   async listMarkdownNotes(): Promise<MarkdownNoteDescriptor[]> {
-    return this.app.vault.getMarkdownFiles().map((file) => ({
+    return this.eligibleFiles().map((file) => ({
       file,
       mtime: file.stat.mtime,
       name: file.basename,
@@ -47,8 +67,11 @@ export class ObsidianMarkdownRepository implements MarkdownRepository {
   }
 
   async getActiveNote(): Promise<MarkdownNote | null> {
-    const file = this.app.workspace.getActiveFile();
-    if (!file) {
+    const file =
+      this.targetPath === undefined
+        ? this.app.workspace.getActiveFile()
+        : this.app.vault.getFileByPath(this.targetPath);
+    if (!file || scopeExclusion(file.path, this.scope)) {
       return null;
     }
 

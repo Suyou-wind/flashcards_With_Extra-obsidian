@@ -23,21 +23,51 @@ it needs.
 From the command palette (`Cmd/Ctrl+P`):
 
 - **Flashcards: Update Anki from current note** — updates Anki from the active note.
-- **Flashcards: Update Anki from vault** — updates Anki from every markdown note.
-- **Flashcards: Check vault for v2 syntax migration** — reports old syntax and
+- **Flashcards: Update Anki from vault** — updates Anki from every eligible Markdown note.
+- **Flashcards: Check vault for v2 syntax migration** — reports old syntax in eligible notes and
   opens each source location without changing the vault.
 - **Flashcards: Apply v2 Anki card style** — previews and backs up existing
   managed Anki models, then installs the v2 design after confirmation.
 
 Running an update again does not duplicate unchanged cards.
 
-The first vault sync reads every Markdown note. It records which notes contain
-no cards in a disposable `vault-scan-index.json` file inside the plugin folder.
-Later vault syncs skip reading and parsing those notes while they remain
-unchanged. Notes containing cards are still checked against Anki. The final
-notice reports how many unchanged card-free notes were skipped.
+The first vault sync reads eligible Markdown notes and records their state in a
+disposable `vault-scan-index.json` file inside the plugin folder. Later vault
+syncs skip unchanged card-free notes. Unchanged notes with cards can also skip
+content reads after the cache is verified against live Anki state. A settings
+change invalidates cache reuse; deleting the index is safe.
 
-Deleting the index is safe. The next vault sync rebuilds it with one full scan.
+The final notice reports eligible notes, notes excluded by sync scope, and
+unchanged notes skipped as separate counts. Excluded notes do not enter cached
+Anki verification or contribute collision warnings.
+
+## Choose which notes sync
+
+Open **Settings → Flashcards → Sync scope**:
+
+- **Included folders**: leave empty to sync the whole vault, or select the folders that contain your flashcards.
+- **Excluded folders**: skip these folders and all their descendants.
+- **Excluded notes**: skip individual Markdown notes. Use **Add notes** to search by full path and select several notes at once. The list groups notes by folder, with alphabetical sorting, collapsible groups, and search.
+
+Exclusions always win. A note inside an included folder can still be excluded individually or through a parent folder. Rules apply to vault sync, current-note sync, and the ribbon button. Attempting to sync an excluded note explains the matching rule and offers **Open sync settings**, which opens the same scope controls in a dialog.
+
+For example, include `Study`, exclude `Study/Archive`, and exclude the note
+`Study/Draft.md`:
+
+| Note | Result |
+| --- | --- |
+| `Study/Topic.md` | Eligible. |
+| `Study/Archive/Old.md` | Excluded by its parent folder. |
+| `Study/Draft.md` | Excluded individually. |
+| `Work/Topic.md` | Outside the included folders. |
+
+You can also right-click a note and choose **Exclude from Flashcards sync**. **Remove note exclusion** removes its individual rule; parent folder exclusions still apply. Notes excluded by folder rules offer access to the scope controls rather than an override.
+
+Excluded notes are skipped before flashcard processing and migration. Their existing Anki cards and note metadata are kept. Re-including a note resumes normal syncing; it does not create a separate copy of its cards. Link and media resolution for eligible notes continues normally, and reading-mode syntax styling is independent of sync scope.
+
+Explicit rules follow note and folder renames or moves made while the plugin is running in Obsidian. Moving an individually excluded note keeps it excluded. A note excluded only through its parent becomes eligible when moved outside that folder, provided it is in the included scope. Renames performed outside Obsidian while it is closed cannot be tracked reliably; missing paths remain listed as **Not found** until you remove or replace them.
+
+Scope edits are unavailable while a sync is running. No frontmatter property or wildcard syntax is required or supported for exclusions.
 
 ## Write cards
 
@@ -272,7 +302,10 @@ target in Obsidian and sync again.
 
 ## How sync works
 
-Two phases per note.
+Scope is checked before reading note contents, offering migration, or launching
+Anki. An excluded current note gets an explanation; a vault with no eligible
+notes reports **No notes match your sync scope**. Eligible notes then use the
+following phases.
 
 **Phase A — local, no network.**
 
@@ -318,14 +351,15 @@ Two persistent indicators at the bottom of the Obsidian window.
 
 - **`Note: …`** — state of the active markdown note. One of:
   - `Note: no cards`
-  - `Note: in sync`
-  - `Note: 2 new, 1 modified, 3 pending migration` (any combination)
+  - `Note: 3 cards, in sync`
+  - `Note: 6 cards, 2 new, 1 modified, 3 pending migration` (any combination)
+  - `Flashcards: excluded` — hover for the matching scope rule.
 - **`⚠ Vault: N pending migration`** — appears only while there are
-  unmigrated v1 anchors across the vault *and* you haven't decided how to
+  unmigrated v1 anchors in eligible notes *and* you haven't decided how to
   handle them yet. Disappears after the migration modal is dismissed.
 
 During a vault sync, a third item shows progress (`3/27 — cells.md`) and
-clears when the run finishes.
+counts eligible notes only, then clears when the run finishes.
 
 ## Migrating from v1
 
@@ -336,20 +370,25 @@ On the first sync against a vault that still has v1 anchors:
 > **Migrate flashcards from a previous version?**
 
 - **Migrate and continue** — adds a `<13-digit>: { hash: … }` entry per
-  v1-anchored card across the whole vault, then runs the sync you asked
+  v1-anchored card in eligible notes across the vault, then runs the sync you asked
   for. Local change only; reversible by deleting the entries.
 - **Sync without migrating** — syncs now and stops prompting. v1 cards
   still reach Anki, but local edits to them won't be detected as updates
   until you migrate.
 - **Cancel** — aborts; you'll be asked again next time.
 
-The prompt is per-vault. To re-trigger it, delete `data.json` from the
-plugin folder (resets all plugin state).
+The migration decision is per-vault. Changing sync scope does not reset it or
+automatically migrate newly included notes. Deleting the plugin's `data.json`
+resets all settings, including scope rules and the migration decision; it is
+not a way to manage individual exclusions.
 
 ## Settings
 
 | Key | Default | Purpose |
 | --- | --- | --- |
+| `syncScope.includedFolders` | `[]` | Only these folders and descendants are eligible; empty means the whole vault. |
+| `syncScope.excludedFolders` | `[]` | Skip these folders and descendants in all syncing and migration scans. |
+| `syncScope.excludedNotes` | `[]` | Skip these exact vault-relative note paths. Exclusions override includes. |
 | `defaultDeck` | `Default` | Fallback deck if neither frontmatter nor folder picks one. |
 | `folderBasedDecks` | `true` | Map folder path to deck (`/` → `::`). |
 | `defaultTags` | `["obsidian"]` | Tags merged into every card. |
@@ -366,6 +405,10 @@ plugin folder (resets all plugin state).
 | `logLevel` | `info` | `debug` \| `info` \| `warn` \| `error`. |
 | `logToFile` | `true` | Append sync events to `sync.log` in the plugin folder. |
 
+The Sync scope UI manages these arrays for you. File rules match full,
+case-sensitive vault-relative paths, not basenames. Folder paths match complete
+path segments: `Study` does not match `Study-old`.
+
 ## Logging
 
 - **Console** — open Obsidian's devtools (`Cmd/Ctrl+Shift+I`), filter for
@@ -375,6 +418,18 @@ plugin folder (resets all plugin state).
   crash the plugin — even a broken adapter just drops the line.
 
 ## Troubleshooting
+
+**A note is excluded, even after I removed its individual exclusion.**
+
+A parent folder exclusion or the included-folder list can still block it.
+Run the current-note update to see the reason, then choose **Open sync
+settings**. An individual note cannot override a folder exclusion.
+
+**A renamed note appears as "Not found" in sync settings.**
+
+Renames are tracked while the plugin is running in Obsidian. If the rename
+happened outside that session, remove the old entry and add the new path.
+Missing entries are kept so temporary absence does not silently discard rules.
 
 **Sync fails — AnkiConnect not reachable.**
 Flashcards starts Anki for you and waits up to `ankiLaunch.waitSeconds`. If it

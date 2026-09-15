@@ -121,3 +121,67 @@ body
 .flashcards-status-hidden {
   display: none;
 }
+
+/* Shared scope editor: align with native settings and keep path lists compact. */
+.flashcards-scope-setting { display: block; }
+.flashcards-sync-scope section { padding: 0; margin: 0; }
+.flashcards-sync-scope section + section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+.flashcards-scope-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.flashcards-sync-scope .flashcards-scope-heading {
+  margin: 0;
+  padding: 0;
+  font-size: var(--font-ui-small);
+  font-weight: var(--font-semibold);
+  line-height: 1.4;
+}
+.flashcards-scope-header button { flex-shrink: 0; }
+.flashcards-sync-scope .flashcards-scope-description {
+  margin: 6px 0 8px;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+}
+.flashcards-sync-scope input[type="search"] { width: 100%; margin-block: 4px; }
+.flashcards-sync-scope summary {
+  cursor: pointer;
+  padding-block: 4px;
+  font-size: var(--font-ui-small);
+  overflow-wrap: anywhere;
+}
+.flashcards-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 2px;
+  font-size: var(--font-ui-small);
+}
+.flashcards-scope-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.flashcards-scope-row .flashcards-scope-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 20px;
+}
+.flashcards-scope-row .flashcards-scope-remove:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.flashcards-scope-remove:focus-visible { outline: 2px solid var(--interactive-accent); outline-offset: 2px; }
+.flashcards-scope-picker { max-height: 50vh; overflow-y: auto; margin-block: 1em; }
+.flashcards-scope-picker label { display: flex; align-items: baseline; gap: 0.5em; padding-block: 0.4em; overflow-wrap: anywhere; }

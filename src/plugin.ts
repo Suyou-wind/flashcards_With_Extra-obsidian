@@ -1,3 +1,6 @@
+import { scopeExclusion } from "./core/config/sync-scope.js";
+import { exclusionMessage } from "./adapters/obsidian/sync-scope-ui.js";
+import { registerSyncScopeEvents } from "./adapters/obsidian/sync-scope-events.js";
 import { Notice, Plugin, TFile, debounce } from "obsidian";
 
 import { registerPluginCommands } from "./adapters/obsidian/commands.js";
@@ -31,7 +34,15 @@ import { registerRenderPreview } from "./render-preview/index.js";
 export default class FlashcardsPlugin extends Plugin implements PluginHost {
   override settings: FlashcardsSettings = DEFAULT_SETTINGS;
   logger: Logger = new NoopLogger();
-  syncInFlight = false;
+  private syncing = false;
+  get syncInFlight(): boolean {
+    return this.syncing;
+  }
+  set syncInFlight(value: boolean) {
+    if (value === this.syncing) return;
+    this.syncing = value;
+    document.dispatchEvent(new Event("flashcards-scope-changed"));
+  }
 
   private fileLogger: ObsidianFileLogger | undefined;
   private activeNoteStatusEl: HTMLElement | undefined;
@@ -56,6 +67,7 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
     setRibbonVisibility(this.ribbonEl, this.settings.showRibbonIcon);
 
     this.registerWorkspaceEvents();
+    registerSyncScopeEvents(this);
     registerRenderPreview(this, () => this.settings);
 
     // Initial paint — defer to next tick so workspace is ready.
@@ -78,6 +90,7 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
 
   private async flushOnUnload(): Promise<void> {
     try {
+      await this.settingsWrites;
       await this.fileLogger?.flush();
       await this.saveData(this.settings);
     } catch (error) {
@@ -85,10 +98,29 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
     }
   }
 
-  async updateSettings(next: Partial<FlashcardsSettings>): Promise<void> {
+  private settingsWrites: Promise<void> = Promise.resolve();
+
+  updateSettings(next: Partial<FlashcardsSettings>): Promise<void> {
+    const write = this.settingsWrites.then(() => this.applySettings(next));
+    this.settingsWrites = write.catch(() => {});
+    return write;
+  }
+
+  private async applySettings(
+    next: Partial<FlashcardsSettings>,
+  ): Promise<void> {
     const prev = this.settings;
     this.settings = { ...this.settings, ...next };
-    await this.saveData(this.settings);
+    try {
+      await this.saveData(this.settings);
+    } catch (error) {
+      this.settings = prev;
+      throw error;
+    }
+    if (prev.syncScope !== this.settings.syncScope) {
+      this.refreshStatusBars();
+      document.dispatchEvent(new Event("flashcards-scope-changed"));
+    }
     if (
       prev.logLevel !== this.settings.logLevel ||
       prev.logToFile !== this.settings.logToFile
@@ -168,18 +200,30 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
     );
   }
 
+  private activeStatusRevision = 0;
+  private pendingStatusRevision = 0;
+
   private async refreshActiveNoteStatus(): Promise<void> {
+    const revision = ++this.activeStatusRevision;
     if (!this.activeNoteStatusEl) return;
     const file = this.app.workspace.getActiveFile();
     if (!file || file.extension !== "md") {
       renderActiveNoteStatus(this.activeNoteStatusEl, null);
       return;
     }
+    const reason = scopeExclusion(file.path, this.settings.syncScope);
+    this.activeNoteStatusEl.title = reason ? exclusionMessage(reason) : "";
+    if (reason) {
+      renderActiveNoteStatus(this.activeNoteStatusEl, "Flashcards: excluded");
+      return;
+    }
     try {
       const markdown = await this.app.vault.read(file);
+      if (revision !== this.activeStatusRevision) return;
       const text = computeActiveNoteStatus(markdown, file.path, this.settings);
       renderActiveNoteStatus(this.activeNoteStatusEl, text);
     } catch (e) {
+      if (revision !== this.activeStatusRevision) return;
       this.logger.warn("refreshActiveNoteStatus failed", {
         path: file.path,
         error: e instanceof Error ? e.message : String(e),
@@ -189,6 +233,7 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
   }
 
   private async refreshPendingV1Status(): Promise<void> {
+    const revision = ++this.pendingStatusRevision;
     if (!this.pendingV1StatusEl) return;
     // Hide once the user has decided — don't keep nagging.
     if (this.settings.v1MigrationDecisionMade) {
@@ -196,10 +241,15 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
       return;
     }
     try {
-      const repository = new ObsidianMarkdownRepository(this.app);
+      const repository = new ObsidianMarkdownRepository(
+        this.app,
+        this.settings.syncScope,
+      );
       const count = await computePendingV1Count(repository);
+      if (revision !== this.pendingStatusRevision) return;
       renderPendingV1(this.pendingV1StatusEl, count);
     } catch (e) {
+      if (revision !== this.pendingStatusRevision) return;
       this.logger.warn("refreshPendingV1Status failed", {
         error: e instanceof Error ? e.message : String(e),
       });

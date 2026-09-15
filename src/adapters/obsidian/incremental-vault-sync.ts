@@ -1,7 +1,8 @@
-import type {
-  AnkiGateway,
-  MarkdownNote,
-} from "../../application/ports.js";
+import {
+  scopeExclusion,
+  type SyncScopeSettings,
+} from "../../core/config/sync-scope.js";
+import type { AnkiGateway, MarkdownNote } from "../../application/ports.js";
 import type { SyncNoteResult } from "../../application/sync-note.js";
 import {
   cacheCandidateMatchesLive,
@@ -51,7 +52,11 @@ interface ScanIndex {
 
 type IncrementalResult = Pick<
   SyncNoteResult,
-  "cacheCandidate" | "notePath" | "parsedCardCount" | "status"
+  | "cacheCandidate"
+  | "notePath"
+  | "parsedCardCount"
+  | "status"
+  | "scopeExclusion"
 > & { lints?: string[] };
 
 export interface IncrementalVaultScan {
@@ -65,6 +70,7 @@ export interface IncrementalVaultScan {
 }
 
 export interface PrepareIncrementalVaultSyncOptions {
+  syncScope?: SyncScopeSettings;
   adapter: ScanAdapter;
   ankiClient?: AnkiGateway;
   indexPath: string;
@@ -129,7 +135,9 @@ async function verifiedCardPaths(
 export async function prepareIncrementalVaultSync(
   options: PrepareIncrementalVaultSyncOptions,
 ): Promise<IncrementalVaultScan> {
-  const descriptors = await options.repository.listMarkdownNotes();
+  const descriptors = (await options.repository.listMarkdownNotes()).filter(
+    (note) => !scopeExclusion(note.path, options.syncScope),
+  );
   const previous = await readIndex(options.adapter, options.indexPath);
   const reusable = previous?.settingsKey === options.settingsKey;
 
@@ -141,7 +149,8 @@ export async function prepareIncrementalVaultSync(
   if (reusable) {
     for (const descriptor of descriptors) {
       const entry = previous.notes[descriptor.path];
-      if (entry === undefined || !descriptorMatches(descriptor, entry)) continue;
+      if (entry === undefined || !descriptorMatches(descriptor, entry))
+        continue;
       if (entry.kind === "empty") unchangedEmptyPaths.add(descriptor.path);
       else cardCandidates.push({ descriptor, entry });
     }
@@ -151,10 +160,7 @@ export async function prepareIncrementalVaultSync(
     cardCandidates,
     options.ankiClient,
   );
-  const skippedPaths = new Set([
-    ...unchangedEmptyPaths,
-    ...unchangedCardPaths,
-  ]);
+  const skippedPaths = new Set([...unchangedEmptyPaths, ...unchangedCardPaths]);
   const selected = descriptors.filter(
     (descriptor) => !skippedPaths.has(descriptor.path),
   );
@@ -193,7 +199,9 @@ export async function prepareIncrementalVaultSync(
       };
 
       for (const descriptor of refreshedDescriptors) {
+        if (scopeExclusion(descriptor.path, options.syncScope)) continue;
         const result = resultByPath.get(descriptor.path);
+        if (result?.scopeExclusion) continue;
         if (
           result?.status === "skipped" &&
           result.parsedCardCount === 0 &&
@@ -254,7 +262,8 @@ function isCacheCandidate(value: unknown): value is SyncNoteCacheCandidate {
     !candidate.atomicCues.every((cue) => typeof cue === "string") ||
     !Array.isArray(candidate.cards) ||
     candidate.cards.length === 0
-  ) return false;
+  )
+    return false;
   return candidate.cards.every((card: unknown) => {
     if (typeof card !== "object" || card === null) return false;
     const item = card as Record<string, unknown>;

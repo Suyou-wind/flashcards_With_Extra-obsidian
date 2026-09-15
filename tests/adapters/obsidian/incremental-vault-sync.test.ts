@@ -309,3 +309,21 @@ describe("prepareIncrementalVaultSync", () => {
     expect(await notePaths(driftScan.notes)).toEqual(["Cards.md"]);
   });
 });
+
+it("never verifies excluded cached cards and processes them again after re-inclusion", async () => {
+  const fixture = createFixture();
+  const gateway = createAnkiGateway();
+  const options = { adapter: fixture.adapter, repository: fixture.repository, indexPath: "index.json", settingsKey: "settings", ankiClient: gateway.client };
+  const first = await prepareIncrementalVaultSync(options);
+  await first.finish([results[0]!, cardCacheResult()]);
+  fixture.readMarkdownNote.mockClear();
+  const excluded = await prepareIncrementalVaultSync({ ...options, syncScope: { includedFolders: [], excludedFolders: [], excludedNotes: ["Cards.md"] } });
+  expect(await notePaths(excluded.notes)).toEqual([]);
+  expect(excluded.skippedUnchangedNoteCount).toBe(1);
+  expect(excluded.cachedAtomicCues).toEqual([]);
+  expect(gateway.notesInfo).not.toHaveBeenCalled();
+  expect(fixture.readMarkdownNote).not.toHaveBeenCalled();
+  await excluded.finish([]);
+  const included = await prepareIncrementalVaultSync(options);
+  expect(await notePaths(included.notes)).toEqual(["Cards.md"]);
+});

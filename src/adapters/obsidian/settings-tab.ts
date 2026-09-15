@@ -1,3 +1,4 @@
+import { renderSyncScope } from "./sync-scope-ui.js";
 import {
   Notice,
   PluginSettingTab,
@@ -40,6 +41,14 @@ function isContextStrategy(value: unknown): value is ContextStrategy {
 }
 
 export class FlashcardsSettingTab extends PluginSettingTab {
+  private disposeScope: (() => void) | undefined;
+
+  override hide(): void {
+    this.disposeScope?.();
+    this.disposeScope = undefined;
+    super.hide();
+  }
+
   constructor(
     app: PluginHost["app"],
     private readonly plugin: PluginHost,
@@ -148,6 +157,24 @@ export class FlashcardsSettingTab extends PluginSettingTab {
               type: "toggle",
               key: "highlightCloze.enabled",
               defaultValue: DEFAULT_SETTINGS.highlightCloze.enabled,
+            },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: "Sync scope",
+        items: [
+          {
+            name: "",
+            render: (setting) => {
+              this.disposeScope?.();
+              setting.infoEl.remove();
+              setting.controlEl.remove();
+              const container = createDiv();
+              setting.settingEl.classList.add("flashcards-scope-setting");
+              setting.settingEl.append(container);
+              this.disposeScope = renderSyncScope(container, this.plugin);
             },
           },
         ],

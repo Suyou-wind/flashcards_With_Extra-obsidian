@@ -64,9 +64,10 @@ missing, the next sync checks and rebuilds it. The Anki note ID still prevents
 a duplicate card.
 
 Vault sync also keeps `vault-scan-index.json` in the plugin directory. The
-first run classifies every Markdown note. Later runs can skip reading and
-parsing an unchanged note only when the previous run proved that it contained
-no cards. Notes with cards are still checked against live Anki data.
+first run classifies eligible Markdown notes. Later runs skip unchanged notes
+previously found to contain no cards. Notes with cards can skip content reads
+and parsing only after their cached state is verified against live Anki data.
+Excluded notes do not enter either path.
 
 Changing a note, changing plugin settings, or installing another plugin
 version invalidates the relevant cached result. If the index is deleted or
@@ -462,6 +463,26 @@ Only after that backup succeeds does it update Anki. The command replaces
 custom template HTML and CSS by design. Cancel the preview to keep the current
 style.
 
+## Sync scope
+
+Use **Settings → Flashcards → Sync scope** to select included folders and
+exclude folders or individual notes. Empty includes means the whole vault.
+Folders cover all descendants; exclusions always override includes.
+
+For example, include `Study`, exclude `Study/Archive`, and exclude the note
+`Study/Draft.md`. `Study/Topic.md` syncs, but the archived notes and draft do
+not. `Study-old/Topic.md` is outside the included folder.
+
+Both sync commands and the ribbon respect these rules. An excluded current
+note shows its reason with an **Open sync settings** action. The settings
+picker supports multiple notes; note exclusions are searchable and grouped by
+folder. The note context menu edits the same settings.
+
+Excluding stops future processing and migration; existing Anki cards and note
+identity metadata remain. Explicit rules follow renames within a running
+Obsidian session. For details and troubleshooting, see the
+[sync scope guide](USAGE.md#choose-which-notes-sync).
+
 ## Defaults
 
 You do not need to write default values in a note or change them in settings.
@@ -469,6 +490,7 @@ You do not need to write default values in a note or change them in settings.
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Minimum Obsidian version | `1.13.0` | Older versions are not supported. |
+| Sync scope | Whole vault | Included folders and both exclusion lists start empty. Exclusions apply to every sync entry point. |
 | Default deck | `Default` | Used when neither frontmatter nor folder selects a deck. |
 | Folder-based decks | On | A note in `Biology/Cells.md` uses deck `Biology`. |
 | Folder deck prefix | Empty | Optional parent for folder-derived decks only. |

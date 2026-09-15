@@ -40,6 +40,7 @@ relevant note(s) and run the plugin commands
 | `v1-only/`    | Legacy `^<13-digit>` anchors only — first sync should show migration modal. |
 | `mixed/`      | One v1 anchor + one v2 anchor — modal shows count=1.                        |
 | `auto-fixes/` | Manual examples for verified v2 parsing and existing-card sync fixes.       |
+| `sync-scope/` | Prefilled scope settings, UI, exclusions, and rename checks.                |
 | `issue-231/`  | Repros for issue #231: remote media and cloze contrast.                     |
 
 ## Features (automated)

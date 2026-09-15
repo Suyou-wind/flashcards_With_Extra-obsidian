@@ -125,3 +125,10 @@ describe("active-note card count", () => {
     ).toBe("Note: 1 card, 1 new");
   });
 });
+
+it("shows excluded instead of pending card operations", () => {
+  expect(computeActiveNoteStatus("Q::A", "Archive/Note.md", {
+    ...DEFAULT_SETTINGS,
+    syncScope: { includedFolders: [], excludedFolders: ["Archive"], excludedNotes: [] },
+  })).toBe("Flashcards: excluded");
+});

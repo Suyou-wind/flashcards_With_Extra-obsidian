@@ -1,3 +1,4 @@
+import { scopeExclusion } from "../core/config/sync-scope.js";
 import type { AnkiGateway, MarkdownNote, MarkdownRepository } from "./ports.js";
 import type { SyncExecutionSession } from "./ports.js";
 import type { FlashcardsSettings } from "../core/config/settings.js";
@@ -50,6 +51,7 @@ function detectCueCollisions(
 }
 
 export interface SyncVaultInput {
+  excludedNoteCount?: number;
   ankiClient: AnkiGateway;
   cachedAtomicCues?: Array<{ cues: string[]; notePath: string }>;
   confirmDeletions?: (pending: PendingDeletion[]) => Promise<boolean>;
@@ -104,6 +106,7 @@ export interface NoteMediaErrors {
 }
 
 export interface SyncVaultResult {
+  excludedNoteCount: number;
   failedNotes: number;
   lints: string[];
   mediaErrors: NoteMediaErrors[];
@@ -117,7 +120,7 @@ export interface SyncVaultResult {
 }
 
 /**
- * Sequentially syncs every markdown note in the vault. Per-note throws are
+ * Sequentially syncs eligible Markdown notes in the vault. Per-note throws are
  * caught and reported as a `failed` result; vault iteration continues.
  *
  * Totals count only `status === "ok"` ops in each note's ankiResults.
@@ -145,13 +148,34 @@ export async function syncVault(
     vaultName,
   } = input;
   const logger: Logger = input.logger ?? new NoopLogger();
-  const trace = createPerfTrace(logger, settings.perfTracing === true, "syncVault");
+  const trace = createPerfTrace(
+    logger,
+    settings.perfTracing === true,
+    "syncVault",
+  );
 
-  const notes = providedNotes ?? (await repository.getAllMarkdownNotes());
+  const sourceNotes = providedNotes ?? (await repository.getAllMarkdownNotes());
+  let excludedNoteCount = input.excludedNoteCount ?? 0;
+  async function* eligibleNotes(): AsyncGenerator<MarkdownNote> {
+    for await (const note of sourceNotes) {
+      if (scopeExclusion(note.path, settings.syncScope)) {
+        excludedNoteCount++;
+        continue;
+      }
+      yield note;
+    }
+  }
+  const notes = eligibleNotes();
   const expectedProcessedNoteCount =
-    declaredProcessedNoteCount ?? (Array.isArray(notes) ? notes.length : 0);
+    declaredProcessedNoteCount ??
+    (Array.isArray(sourceNotes)
+      ? (sourceNotes as MarkdownNote[]).filter(
+          (note) => !scopeExclusion(note.path, settings.syncScope),
+        ).length
+      : 0);
   const total = expectedProcessedNoteCount;
-  const expectedNoteCount = expectedProcessedNoteCount + skippedUnchangedNoteCount;
+  const expectedNoteCount =
+    expectedProcessedNoteCount + skippedUnchangedNoteCount;
 
   logger.info("syncVault start", {
     noteCount: expectedNoteCount,
@@ -181,71 +205,74 @@ export async function syncVault(
     }
     let liveState: LiveAnkiState | undefined;
     try {
-      liveState = await loadLiveAnkiState(
-        ankiClient,
-        uniqueKnownNids(batch),
-      );
+      liveState = await loadLiveAnkiState(ankiClient, uniqueKnownNids(batch));
     } catch (error) {
-      logger.warn("syncVault batched Anki preflight failed; using note fallback", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      logger.warn(
+        "syncVault batched Anki preflight failed; using note fallback",
+        {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
     }
 
     for (const note of batch) {
-    let result: SyncNoteResult;
-    try {
-      result = await syncNote({
-        ankiClient,
-        ...(confirmDeletions ? { confirmDeletions } : {}),
-        ...(confirmKindRecreations ? { confirmKindRecreations } : {}),
-        ...(confirmRebinds ? { confirmRebinds } : {}),
-        executionSession,
-        ...(generateBlockId ? { generateBlockId } : {}),
-        logger,
-        ...(liveState ? { liveState } : {}),
-        ...(mediaPipeline ? { mediaPipeline } : {}),
-        note,
-        perfTrace: trace,
-        repository,
-        ...(resolveLink ? { resolveLink } : {}),
-        settings,
-        vaultName,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      logger.error("syncVault note threw", { notePath: note.path, error: msg });
-      result = {
-        error: msg,
-        identityWritesApplied: 0,
-        lints: [],
-        notePath: note.path,
-        parsedCardCount: 0,
-        recoveredMissingCount: 0,
-        status: "failed",
-        writebackEditsApplied: 0,
-      };
-    }
+      let result: SyncNoteResult;
+      try {
+        result = await syncNote({
+          ankiClient,
+          ...(confirmDeletions ? { confirmDeletions } : {}),
+          ...(confirmKindRecreations ? { confirmKindRecreations } : {}),
+          ...(confirmRebinds ? { confirmRebinds } : {}),
+          executionSession,
+          ...(generateBlockId ? { generateBlockId } : {}),
+          logger,
+          ...(liveState ? { liveState } : {}),
+          ...(mediaPipeline ? { mediaPipeline } : {}),
+          note,
+          perfTrace: trace,
+          repository,
+          ...(resolveLink ? { resolveLink } : {}),
+          settings,
+          vaultName,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logger.error("syncVault note threw", {
+          notePath: note.path,
+          error: msg,
+        });
+        result = {
+          error: msg,
+          identityWritesApplied: 0,
+          lints: [],
+          notePath: note.path,
+          parsedCardCount: 0,
+          recoveredMissingCount: 0,
+          status: "failed",
+          writebackEditsApplied: 0,
+        };
+      }
 
-    if (result.status === "failed") failedNotes += 1;
-    if (result.ankiResults) {
-      for (const c of result.ankiResults.creates)
-        if (c.status === "ok") totalCreates += 1;
-      for (const u of result.ankiResults.updates)
-        if (u.status === "ok") totalUpdates += 1;
-      for (const d of result.ankiResults.deletes)
-        if (d.status === "ok") totalDeletes += 1;
-    }
+      if (result.status === "failed") failedNotes += 1;
+      if (result.ankiResults) {
+        for (const c of result.ankiResults.creates)
+          if (c.status === "ok") totalCreates += 1;
+        for (const u of result.ankiResults.updates)
+          if (u.status === "ok") totalUpdates += 1;
+        for (const d of result.ankiResults.deletes)
+          if (d.status === "ok") totalDeletes += 1;
+      }
 
-    if (result.mediaErrors && result.mediaErrors.length > 0) {
-      mediaErrors.push({
-        notePath: result.notePath,
-        errors: result.mediaErrors,
-      });
-    }
+      if (result.mediaErrors && result.mediaErrors.length > 0) {
+        mediaErrors.push({
+          notePath: result.notePath,
+          errors: result.mediaErrors,
+        });
+      }
 
-    perNote.push(result);
-    current += 1;
-    onProgress?.(current, total || current, note.path);
+      perNote.push(result);
+      current += 1;
+      onProgress?.(current, total || current, note.path);
     }
   }
 
@@ -269,7 +296,9 @@ export async function syncVault(
   }
 
   const collisionLints = detectCueCollisions([
-    ...cachedAtomicCues,
+    ...cachedAtomicCues.filter(
+      (item) => !scopeExclusion(item.notePath, settings.syncScope),
+    ),
     ...perNote.map((result) => ({
       cues: result.atomicCues ?? [],
       notePath: result.notePath,
@@ -283,6 +312,7 @@ export async function syncVault(
   trace.finish();
 
   return {
+    excludedNoteCount,
     failedNotes,
     lints,
     mediaErrors,

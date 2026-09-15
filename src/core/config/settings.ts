@@ -1,3 +1,5 @@
+import { mergeSyncScope, type SyncScopeSettings } from "./sync-scope.js";
+
 export type ContextStrategy = "headings" | "none" | "note-title";
 export type ExplicitSyntax = "fenced";
 export type LogLevelSetting = "debug" | "info" | "warn" | "error";
@@ -34,6 +36,7 @@ export interface RenderPreviewSettings {
 }
 
 export interface FlashcardsSettings {
+  syncScope: SyncScopeSettings;
   /** Name of an Obsidian SecretStorage entry, never the secret value itself. */
   ankiConnectApiKeySecret: string;
   ankiLaunch: AnkiLaunchSettings;
@@ -63,6 +66,7 @@ export interface FlashcardsSettings {
 }
 
 export const DEFAULT_SETTINGS: FlashcardsSettings = {
+  syncScope: mergeSyncScope(undefined),
   ankiConnectApiKeySecret: "",
   ankiLaunch: { enabled: true, command: "", waitSeconds: 60 },
   atomic: { enabled: true },
@@ -165,6 +169,7 @@ export function mergeSettings(
   return {
     ...defaults,
     ...mergedCandidate,
+    syncScope: mergeSyncScope(candidate.syncScope ?? defaults.syncScope),
     ankiLaunch: mergeAnkiLaunch(defaults.ankiLaunch, candidate.ankiLaunch),
     atomic: mergeSyntaxToggle(defaults.atomic, candidate.atomic),
     cloze: mergeSyntaxToggle(defaults.cloze, candidate.cloze),

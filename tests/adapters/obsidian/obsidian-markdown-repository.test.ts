@@ -128,3 +128,19 @@ describe("ObsidianMarkdownRepository", () => {
     expect(modify).not.toHaveBeenCalled();
   });
 });
+
+it("filters folder and file rules before full or incremental content reads", async () => {
+  const { app, read, cachedRead } = createApp();
+  const repository = new ObsidianMarkdownRepository(app as never, { includedFolders: [], excludedFolders: ["Folder"], excludedNotes: ["First.md"] });
+  expect(await repository.getAllMarkdownNotes()).toEqual([]);
+  expect(await repository.listMarkdownNotes()).toEqual([]);
+  expect(repository.excludedNoteCount).toBe(2);
+  expect(read).not.toHaveBeenCalled();
+  expect(cachedRead).not.toHaveBeenCalled();
+});
+
+it("keeps the selected note when the active tab changes", async () => {
+  const { app } = createApp({ path: "Other.md", basename: "Other" });
+  const repository = new ObsidianMarkdownRepository(app as never, undefined, "First.md");
+  expect((await repository.getActiveNote())?.path).toBe("First.md");
+});

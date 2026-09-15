@@ -1,6 +1,8 @@
+import type * as ScopeUI from "../../../src/adapters/obsidian/sync-scope-ui.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  showScopeExclusion: vi.fn(),
   getActiveNote: vi.fn(),
   getAllMarkdownNotes: vi.fn<
     () => Promise<
@@ -46,6 +48,11 @@ vi.mock("obsidian", () => ({
   },
 }));
 
+vi.mock("../../../src/adapters/obsidian/sync-scope-ui.js", async (importOriginal) => ({
+  ...await importOriginal<typeof ScopeUI>(),
+  showScopeExclusion: mocks.showScopeExclusion,
+}));
+
 vi.mock("../../../src/adapters/anki/anki-connect-client.js", () => ({
   AnkiConnectClient: class {
     version = mocks.ankiVersion;
@@ -78,6 +85,7 @@ vi.mock("../../../src/adapters/obsidian/anki-style-confirm-modal.js", () => ({
 vi.mock("../../../src/adapters/obsidian/obsidian-markdown-repository.js", () => ({
   ObsidianMarkdownRepository: class {
     getActiveNote = mocks.getActiveNote;
+    listMarkdownNotes = async () => mocks.getAllMarkdownNotes();
     getAllMarkdownNotes = mocks.getAllMarkdownNotes;
   },
 }));
@@ -188,7 +196,29 @@ function createHost() {
 }
 
 describe("Obsidian sync commands", () => {
+  it.each(["command", "ribbon"])("explains folder exclusion before migration or Anki from %s", async (entry) => {
+    const { host, current, actions } = createHost();
+    host.settings.v1MigrationDecisionMade = false;
+    host.settings.syncScope.excludedFolders = ["Archive"];
+    host.app.workspace.getActiveFile = () => ({ extension: "md", path: "Archive/Note.md" }) as never;
+    if (entry === "command") current.checkCallback!(false); else actions.updateAnkiFromCurrentNote();
+    await vi.waitFor(() => expect(mocks.showScopeExclusion).toHaveBeenCalledWith(host, { kind: "folder", path: "Archive" }));
+    expect(mocks.getAllMarkdownNotes).not.toHaveBeenCalled();
+    expect(mocks.getActiveNote).not.toHaveBeenCalled();
+    expect(mocks.ankiVersion).not.toHaveBeenCalled();
+    expect(mocks.launchAnkiCommand).not.toHaveBeenCalled();
+    expect(mocks.syncNote).not.toHaveBeenCalled();
+  });
+
+  it("reports an empty sync scope without contacting Anki", async () => {
+    const { commands } = createHost();
+    commands.find((command) => command.id === "flashcards-sync-vault")!.callback!();
+    await vi.waitFor(() => expect(mocks.notices.some((notice) => notice.message === "No notes match your sync scope.")).toBe(true));
+    expect(mocks.ankiVersion).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
+    mocks.showScopeExclusion.mockClear();
     mocks.getActiveNote.mockReset();
     mocks.getAllMarkdownNotes.mockReset();
     mocks.getAllMarkdownNotes.mockResolvedValue([]);
@@ -419,6 +449,7 @@ describe("Obsidian sync commands", () => {
 describe("Anki availability gate", () => {
   beforeEach(() => {
     mocks.notices.length = 0;
+    mocks.showScopeExclusion.mockClear();
     mocks.getActiveNote.mockReset();
     mocks.getActiveNote.mockResolvedValue(null);
     mocks.repairManagedSourceTemplates.mockClear();

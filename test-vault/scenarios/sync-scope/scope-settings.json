@@ -1,0 +1,17 @@
+{
+  "includedFolders": [
+    "scenarios/sync-scope/Study",
+    "scenarios/sync-scope/Practice"
+  ],
+  "excludedFolders": [
+    "scenarios/sync-scope/Study/Archive",
+    "scenarios/sync-scope/Practice/Private"
+  ],
+  "excludedNotes": [
+    "scenarios/sync-scope/Study/Individual.md",
+    "scenarios/sync-scope/Practice/Individual.md",
+    "scenarios/sync-scope/Study/Archive/Also explicit.md",
+    "scenarios/sync-scope/Study/Drafts/Zebra.md",
+    "scenarios/sync-scope/Study/Drafts/Alpha.md"
+  ]
+}

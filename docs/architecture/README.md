@@ -1,65 +1,38 @@
-# Architecture diagrams — prototype comparison
+# Architecture documentation
 
-Two parallel prototypes to evaluate which approach keeps diagrams from
-going stale over time.
+The plugin separates pure card logic, application use cases, and Obsidian/Anki
+adapters. Start with [the architecture overview](overview.md), including the
+sync scope rules that run before note processing.
 
-## A — Mermaid + dependency-cruiser (`overview.md` + `.dependency-cruiser.cjs`)
+## Enforced boundaries
 
-- **What you write**: Mermaid blocks in `overview.md` (rendered by GitHub,
-  Obsidian, any Markdown viewer). One config file with layer rules.
-- **Drift defense**: `npm run arch:check` fails when source code violates
-  the rules the diagram claims. The diagram is *prose*; the rules are the
-  *contract*.
-- **Inspect deps graphically**: `npm run arch:graph` → `docs/architecture/graph.svg`
-  (requires Graphviz `dot` installed locally).
-- **Cost**: cheap. ~50 lines of config. Mermaid is already in your toolchain.
+`.dependency-cruiser.cjs` checks that:
 
-## B — Likec4 (`likec4/model.c4`)
+- Core does not import application code, adapters, or Obsidian.
+- Application code does not import adapters or Obsidian; it uses interfaces in
+  `src/application/ports.ts` for I/O.
+- Imports do not form cycles.
 
-- **What you write**: a single `.c4` DSL file describing elements,
-  relations, and named views.
-- **Render**: `npm run arch:likec4` starts a dev server with an
-  interactive browser-based diagram viewer. `npm run arch:likec4:build`
-  produces a static site under `likec4/out/`.
-- **Drift defense**: **none built-in.** Likec4 is descriptive. It will
-  validate the DSL's internal consistency, but it does not check whether
-  the real code matches.
-- **Cost**: ~140 npm packages added. ~1.8 MB JS for the built static site.
-  Worth it only if the interactive multi-view UI is valuable.
+`npm run arch:check` runs these checks. It is also part of `npm run check`,
+alongside lint, Markdown lint, dead-code checks, tests, and the production build.
+The former concrete-adapter imports and plugin/adapter cycles have been
+replaced with ports and the `PluginHost` interface.
 
-## What the prototype already proved
+Dependency checks enforce import boundaries; they do not prove the accuracy of
+every runtime step in a diagram. Keep the prose and diagrams aligned with
+changes to commands, application use cases, and adapter behavior.
 
-Running `npm run arch:check` against the current `rewrite-v2` branch
-surfaced **10 real violations** of the layering both prototypes describe:
+## Views and tools
 
-1. `src/core/edits/writeback-sync-results.ts` imports `src/adapters/anki/execute-sync-plan.ts`
-   — a `core → adapters` leak.
-2. `src/application/sync-vault.ts`, `sync-note.ts`, `migration-check.ts`,
-   `backfill-v1-vault.ts` import concrete adapter classes directly
-   (`obsidian-markdown-repository`, `anki-connect-client`,
-   `execute-sync-plan`) instead of ports. No interfaces defined.
-3. Circular imports: `plugin.ts ↔ adapters/obsidian/settings-tab.ts`,
-   `plugin.ts ↔ adapters/obsidian/commands.ts`.
+- [Overview](overview.md): Mermaid diagrams and a description of sync scope.
+- `npm run arch:graph`: generate a dependency graph at
+  `docs/architecture/graph.svg`; requires Graphviz `dot`.
+- [LikeC4 model](likec4/model.c4): an optional high-level view of runtime
+  collaboration. An application-to-adapter arrow represents a call through a
+  port, not an application import of the adapter.
+- `npm run arch:likec4`: open the interactive LikeC4 viewer.
+- `npm run arch:likec4:build`: build the viewer into the ignored
+  `docs/architecture/likec4/out/` directory.
 
-This is the headline finding of the prototype: **A catches drift, B does not.**
-If your goal is "diagrams that don't lie," A is the only one that mechanically
-delivers. B gives you nicer pictures and named views for human consumption.
-
-## Recommendation
-
-Keep both during evaluation. After a week:
-
-- If you find yourself opening the Likec4 viewer often → invest in B,
-  keep A for enforcement (they're complementary, not exclusive).
-- If you don't → drop B (remove `likec4` from devDependencies), keep A.
-
-`arch:check` is **not** wired into `npm run check` yet because the current
-code fails it. Fix the 10 violations first, then add `npm run arch:check`
-to the `check` script to lock it in.
-
-## Files
-
-- `overview.md` — Prototype A diagrams
-- `../../.dependency-cruiser.cjs` — Prototype A rules (enforced)
-- `likec4/model.c4` — Prototype B model
-- `likec4/out/` — Prototype B built site (gitignored)
+The LikeC4 model is descriptive, not generated from source imports. Use
+`arch:check` for boundary enforcement and tests for runtime behavior.

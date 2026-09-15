@@ -109,6 +109,11 @@ describe("FlashcardsSettingTab", () => {
       }),
       expect.objectContaining({
         type: "group",
+        heading: "Sync scope",
+        items: [expect.objectContaining({ name: "", render: expect.any(Function) })],
+      }),
+      expect.objectContaining({
+        type: "group",
         heading: "Anki connection",
         items: expect.arrayContaining([
           expect.objectContaining({

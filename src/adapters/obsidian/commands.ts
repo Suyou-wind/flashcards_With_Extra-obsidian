@@ -1,11 +1,10 @@
+import { scopeExclusion } from "../../core/config/sync-scope.js";
+import { exclusionMessage, showScopeExclusion } from "./sync-scope-ui.js";
 import { Notice } from "obsidian";
 
 import type { PluginHost } from "./plugin-host.js";
 import type { AnkiConnectClient } from "../anki/anki-connect-client.js";
-import {
-  createAnkiClient,
-  ensureAnkiAvailable,
-} from "./anki-availability.js";
+import { createAnkiClient, ensureAnkiAvailable } from "./anki-availability.js";
 import { repairManagedSourceTemplates } from "../anki/repair-managed-source-templates.js";
 import {
   applyManagedModelStyle,
@@ -156,7 +155,10 @@ async function runAnkiStyleMigration(plugin: PluginHost): Promise<void> {
 
 async function showSyntaxMigrationReport(plugin: PluginHost): Promise<void> {
   try {
-    const repository = new ObsidianMarkdownRepository(plugin.app);
+    const repository = new ObsidianMarkdownRepository(
+      plugin.app,
+      plugin.settings.syncScope,
+    );
     const items = buildSyntaxMigrationReport(
       await repository.getAllMarkdownNotes(),
     );
@@ -193,19 +195,57 @@ async function runWithMigrationCheck(
     new Notice("Sync already in progress.");
     return;
   }
-  const repository = new ObsidianMarkdownRepository(plugin.app);
+  plugin.syncInFlight = true;
+  try {
+    await prepareSyncWithMigrationCheck(plugin, target);
+  } catch (error) {
+    plugin.logger.error("Sync preparation failed", error);
+    new Notice(
+      `Sync failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  } finally {
+    plugin.syncInFlight = false;
+    plugin.refreshStatusBars();
+  }
+}
+
+async function prepareSyncWithMigrationCheck(
+  plugin: PluginHost,
+  target: Target,
+): Promise<void> {
+  const selectedPath =
+    target === "current"
+      ? plugin.app.workspace.getActiveFile()?.path
+      : undefined;
+  if (target === "current" && !selectedPath) {
+    new Notice("No active Markdown note.");
+    return;
+  }
+  if (selectedPath) {
+    const reason = scopeExclusion(selectedPath, plugin.settings.syncScope);
+    if (reason) {
+      showScopeExclusion(plugin, reason);
+      return;
+    }
+  }
+  const repository = new ObsidianMarkdownRepository(
+    plugin.app,
+    plugin.settings.syncScope,
+    selectedPath,
+  );
+  if (
+    target === "vault" &&
+    (await repository.listMarkdownNotes()).length === 0
+  ) {
+    new Notice("No notes match your sync scope.");
+    return;
+  }
   const ankiClient = createAnkiClient(plugin);
   const vaultName = plugin.app.vault.getName();
 
   // Fast path: decision already made → no vault scan.
   if (plugin.settings.v1MigrationDecisionMade) {
-    plugin.syncInFlight = true;
-    try {
-      await dispatch(plugin, repository, ankiClient, vaultName, target);
-    } finally {
-      plugin.syncInFlight = false;
-      plugin.refreshStatusBars();
-    }
+    await dispatch(plugin, ankiClient, vaultName, target, selectedPath);
     return;
   }
 
@@ -220,13 +260,7 @@ async function runWithMigrationCheck(
     if (!plugin.settings.v1MigrationDecisionMade) {
       await plugin.updateSettings({ v1MigrationDecisionMade: true });
     }
-    plugin.syncInFlight = true;
-    try {
-      await dispatch(plugin, repository, ankiClient, vaultName, target);
-    } finally {
-      plugin.syncInFlight = false;
-      plugin.refreshStatusBars();
-    }
+    await dispatch(plugin, ankiClient, vaultName, target, selectedPath);
     return;
   }
 
@@ -237,12 +271,29 @@ async function runWithMigrationCheck(
       new Notice("Sync cancelled.");
     },
     onMigrate: () => {
+      if (plugin.syncInFlight) {
+        new Notice("Sync already in progress.");
+        return;
+      }
       void (async () => {
         plugin.syncInFlight = true;
         try {
+          if (selectedPath) {
+            const reason = scopeExclusion(
+              selectedPath,
+              plugin.settings.syncScope,
+            );
+            if (reason) {
+              showScopeExclusion(plugin, reason);
+              return;
+            }
+          }
           try {
             const result = await backfillV1Vault({
-              repository,
+              repository: new ObsidianMarkdownRepository(
+                plugin.app,
+                plugin.settings.syncScope,
+              ),
               settings: plugin.settings,
             });
             new Notice(
@@ -255,7 +306,7 @@ async function runWithMigrationCheck(
             return;
           }
           await plugin.updateSettings({ v1MigrationDecisionMade: true });
-          await dispatch(plugin, repository, ankiClient, vaultName, target);
+          await dispatch(plugin, ankiClient, vaultName, target, selectedPath);
         } finally {
           plugin.syncInFlight = false;
           plugin.refreshStatusBars();
@@ -263,11 +314,15 @@ async function runWithMigrationCheck(
       })();
     },
     onSkip: () => {
+      if (plugin.syncInFlight) {
+        new Notice("Sync already in progress.");
+        return;
+      }
       void (async () => {
         plugin.syncInFlight = true;
         try {
           await plugin.updateSettings({ v1MigrationDecisionMade: true });
-          await dispatch(plugin, repository, ankiClient, vaultName, target);
+          await dispatch(plugin, ankiClient, vaultName, target, selectedPath);
         } finally {
           plugin.syncInFlight = false;
           plugin.refreshStatusBars();
@@ -298,11 +353,30 @@ function createMediaPipeline(
 
 async function dispatch(
   plugin: PluginHost,
-  repository: ObsidianMarkdownRepository,
   ankiClient: AnkiConnectClient,
   vaultName: string,
   target: Target,
+  selectedPath?: string,
 ): Promise<void> {
+  if (selectedPath) {
+    const reason = scopeExclusion(selectedPath, plugin.settings.syncScope);
+    if (reason) {
+      showScopeExclusion(plugin, reason);
+      return;
+    }
+  }
+  const repository = new ObsidianMarkdownRepository(
+    plugin.app,
+    plugin.settings.syncScope,
+    selectedPath,
+  );
+  if (
+    target === "vault" &&
+    (await repository.listMarkdownNotes()).length === 0
+  ) {
+    new Notice("No notes match your sync scope.");
+    return;
+  }
   if (!(await ensureAnkiAvailable(plugin, ankiClient))) return;
 
   const resolveLink = createWikilinkResolver(plugin.app.metadataCache);
@@ -362,6 +436,7 @@ async function dispatch(
           adapter: plugin.app.vault.adapter,
           ankiClient,
           indexPath: `${pluginDirectory}/vault-scan-index.json`,
+          syncScope: plugin.settings.syncScope,
           repository,
           settingsKey: JSON.stringify({
             pluginVersion: plugin.manifest.version,
@@ -372,6 +447,7 @@ async function dispatch(
         result = await syncVault({
           ankiClient,
           cachedAtomicCues: incremental.cachedAtomicCues,
+          excludedNoteCount: repository.excludedNoteCount,
           ...(confirmDeletions ? { confirmDeletions } : {}),
           confirmKindRecreations,
           executionSession,
@@ -422,7 +498,9 @@ function summarizeNote(result: SyncNoteResult): string {
     return `Sync failed: ${result.error ?? "unknown error"} — see sync.log`;
   }
   if (result.status === "skipped") {
-    return "No cards detected.";
+    return result.scopeExclusion
+      ? `Excluded from Flashcards sync. ${exclusionMessage(result.scopeExclusion)}`
+      : "No cards detected.";
   }
   const r = result.ankiResults;
   const creates = r ? r.creates.filter((c) => c.status === "ok").length : 0;
@@ -457,6 +535,9 @@ function summarizeVault(result: SyncVaultResult): string {
     parts.length > 0 ? ` (${parts.join(", ")} — see sync.log)` : "";
   return (
     `Vault sync: ${result.noteCount} notes` +
+    (result.excludedNoteCount > 0
+      ? ` (${result.excludedNoteCount} excluded by sync scope)`
+      : "") +
     (result.skippedUnchangedNoteCount > 0
       ? ` (${result.skippedUnchangedNoteCount} unchanged verified notes skipped)`
       : "") +

@@ -198,15 +198,33 @@ You can change these defaults in the Flashcards settings.
 ## Commands
 
 - **Flashcards: Update Anki from current note** updates the active note.
-- **Flashcards: Update Anki from vault** updates every note in the vault.
-- **Flashcards: Check vault for v2 syntax migration** reports old syntax and
+- **Flashcards: Update Anki from vault** updates every eligible Markdown note in the vault.
+- **Flashcards: Check vault for v2 syntax migration** reports old syntax in eligible notes and
   opens its source without changing files.
 - **Flashcards: Apply v2 Anki card style** previews, backs up, and updates
   compatible managed Anki note types.
 
 Running an update again does not duplicate unchanged cards. Vault updates keep
-a disposable index to avoid reading unchanged card-free notes. Deleting this
-index is safe; the next update rebuilds it.
+a disposable index to skip unchanged notes, verifying existing cards against
+Anki before reusing their cached state. Deleting the index is safe; the next
+update rebuilds it.
+
+## Choose which notes sync
+
+Under **Settings → Flashcards → Sync scope**, choose included folders, excluded
+folders, and excluded notes. Empty included folders means the whole vault;
+folder rules cover descendants, and exclusions always win.
+
+Exclusions apply to both update commands and the ribbon button. Right-click a
+note to **Exclude from Flashcards sync**, or use the searchable settings picker
+to add several notes at once. Excluded notes are grouped by folder in settings.
+An attempted update of an excluded note explains the reason and offers access
+to the scope editor.
+
+Existing Anki cards are kept when a note is excluded. Explicit rules follow
+renames and moves made while the plugin is running in Obsidian.
+See the [sync scope guide](docs/USAGE.md#choose-which-notes-sync) for examples,
+rule precedence, and missing-path handling.
 
 ## Existing cards and v1 notes
 

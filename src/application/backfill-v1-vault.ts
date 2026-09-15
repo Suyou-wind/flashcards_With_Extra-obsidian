@@ -1,3 +1,4 @@
+import { scopeExclusion } from "../core/config/sync-scope.js";
 import type { MarkdownRepository } from "./ports.js";
 import type { FlashcardsSettings } from "../core/config/settings.js";
 import { applyTextEdits } from "../core/edits/apply-text-edits.js";
@@ -14,7 +15,7 @@ export interface BackfillV1VaultResult {
 }
 
 /**
- * Vault-wide v1 anchor backfill. Iterates every markdown note, computes the
+ * Vault-wide v1 anchor backfill. Skips excluded notes, computes the
  * v1 → v2 frontmatter migration edits, and writes them back. Notes with no
  * unmigrated v1 anchors are skipped.
  */
@@ -28,6 +29,7 @@ export async function backfillV1Vault(
   let totalBackfilledCount = 0;
 
   for (const note of notes) {
+    if (scopeExclusion(note.path, settings.syncScope)) continue;
     const result = backfillV1Anchors({
       markdown: note.markdown,
       notePath: note.path,

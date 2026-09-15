@@ -1,3 +1,4 @@
+import { scopeExclusion } from "../../core/config/sync-scope.js";
 import { setIcon } from "obsidian";
 
 import { detectV1Migration } from "../../application/detect-v1-migration.js";
@@ -22,6 +23,7 @@ export function computeActiveNoteStatus(
   notePath: string,
   settings: FlashcardsSettings,
 ): string {
+  if (scopeExclusion(notePath, settings.syncScope)) return "Flashcards: excluded";
   let counter = 0;
   const preview = previewSyncPlan({
     generateBlockId: () => `q-tmp${counter++}`,
@@ -50,7 +52,7 @@ export function computeActiveNoteStatus(
 }
 
 /**
- * Sums unmigrated v1 anchors across every markdown note in the vault.
+ * Sums unmigrated v1 anchors from the supplied (scope-filtered) repository.
  * Cheap enough for non-debounced calls on small vaults; debounce upstream
  * for vault-modify events on large ones.
  */
