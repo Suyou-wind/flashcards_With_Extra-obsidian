@@ -27,3 +27,6 @@ examples, and troubleshooting.
 - Keep the scope editor up to date when settings are in another window.
 - Report settings-save failures after migration dialogs and release the sync
   lock so another attempt can run.
+- Stop cloze answers from jumping to Extra when revealed. For existing Anki
+  models, run **Flashcards: Apply v2 Anki card style** after updating. This backs
+  up and replaces templates/CSS while keeping card IDs and review history.

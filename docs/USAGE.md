@@ -343,7 +343,12 @@ templates, and CSS under
 failed backup means Anki is not changed.
 
 The command updates shared Anki models in place. It does not recreate notes, so
-existing note IDs, schedules, and review history remain.
+existing note IDs, schedules, and review history remain. The command replaces
+custom templates and CSS on the listed models.
+
+If cloze answers jump down to Extra when revealed, run this command after
+updating the plugin. The current cloze template removes the forced scroll
+target; existing templates keep it until you reapply the style.
 
 ## Status bar
 

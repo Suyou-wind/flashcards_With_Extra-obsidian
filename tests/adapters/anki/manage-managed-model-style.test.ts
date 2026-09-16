@@ -7,6 +7,7 @@ import {
 } from "../../../src/adapters/anki/manage-managed-model-style.js";
 import {
   ANKI_MODEL_BASIC,
+  ANKI_MODEL_CLOZE,
   getAnkiModelSpecs,
 } from "../../../src/core/render/render-card.js";
 import { makeFakeFetch, ok } from "../../_utils/fake-fetch.js";
@@ -19,6 +20,25 @@ const CUSTOM_TEMPLATES = {
 };
 
 describe("inspectManagedModelStyle", () => {
+  it("offers the cloze scroll fix through the existing style command and preserves the old template for backup", async () => {
+    const spec = getAnkiModelSpecs().find((model) => model.modelName === ANKI_MODEL_CLOZE)!;
+    const current = {
+      "Card 1": {
+        Front: spec.cardTemplates[0]!.Front,
+        Back: `${spec.cardTemplates[0]!.Front}{{#Extra}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>`,
+      },
+    };
+    const { fetch } = makeFakeFetch([
+      ok([ANKI_MODEL_CLOZE]), ok(spec.inOrderFields), ok(current), ok({ css: spec.css }),
+    ]);
+    const plan = await inspectManagedModelStyle(new AnkiConnectClient({ fetch }));
+    expect(plan.blocked).toEqual([]);
+    expect(plan.changes).toHaveLength(1);
+    expect(plan.changes[0]!.current.templates).toEqual(current);
+    expect(plan.changes[0]!.desired.templates["Card 1"]!.Back)
+      .toBe(current["Card 1"].Back.replace(' id="answer"', ""));
+  });
+
   it("keeps an exact backup and maps the v2 template onto the existing template name", async () => {
     const { fetch } = makeFakeFetch([
       ok([ANKI_MODEL_BASIC]),

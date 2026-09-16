@@ -213,7 +213,8 @@ const REVERSED_FRONT_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashca
 const REVERSED_BACK_TEMPLATE =
   '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Front}}</section><footer class="flashcards-source-footer">{{Source}}</footer>';
 const CLOZE_FRONT_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>`;
-const CLOZE_BACK_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>{{#Extra}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>`;
+// Cloze answers appear within Text; an answer ID would scroll away to Extra.
+const CLOZE_BACK_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>{{#Extra}}<hr class="flashcards-answer-divider"><section class="flashcards-answer">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>`;
 const REMINDER_FRONT_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-reminder">{{Content}}</section>`;
 const REMINDER_BACK_TEMPLATE =
   '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-reminder-guidance">How soon should this come back?</section><footer class="flashcards-source-footer">{{Source}}</footer>';

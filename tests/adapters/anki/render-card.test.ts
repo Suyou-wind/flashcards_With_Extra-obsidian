@@ -154,8 +154,16 @@ describe("getAnkiModelSpecs", () => {
       `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>`,
     );
     expect(spec.cardTemplates[0]!.Back).toBe(
-      `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>{{#Extra}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>`,
+      `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>{{#Extra}}<hr class="flashcards-answer-divider"><section class="flashcards-answer">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>`,
     );
+  });
+
+  it("cloze templates do not force scrolling away from the revealed text", () => {
+    const spec = getAnkiModelSpecs().find((s) => s.modelName === ANKI_MODEL_CLOZE)!;
+    for (const template of spec.cardTemplates) {
+      expect(template.Front).not.toMatch(/id\s*=\s*["']?answer\b/i);
+      expect(template.Back).not.toMatch(/id\s*=\s*["']?answer\b/i);
+    }
   });
 
   it("Obsidian-Reminder: stores one Content field and asks only about timing", () => {
