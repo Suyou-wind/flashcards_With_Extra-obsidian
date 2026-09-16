@@ -14,7 +14,7 @@
     "dead-code:check": "knip --include files,dependencies,unlisted,exports",
     "coverage": "vitest run --coverage",
     "dev": "node esbuild.config.mjs",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "lint:md": "markdownlint-cli2",
     "prepare": "husky",
     "test": "vitest run",
@@ -22,11 +22,12 @@
     "bench": "node --experimental-strip-types scripts/bench-run.ts",
     "bench:compare": "node --experimental-strip-types scripts/bench-compare.ts",
     "bench:baseline": "cp .perf-current.json .perf-baseline.json",
-    "test-vault:reset": "git checkout HEAD -- test-vault/scenarios/ test-vault/features/ && rm -f test-vault/.obsidian/plugins/flashcards-obsidian/data.json test-vault/.obsidian/plugins/flashcards-obsidian/sync.log && echo '\u2713 test-vault reset. Reload Obsidian (Cmd/Ctrl+R) to pick up clean state.'",
+    "test-vault:reset": "git checkout HEAD -- test-vault/scenarios/ test-vault/features/ && rm -f test-vault/.obsidian/plugins/flashcards-obsidian/data.json test-vault/.obsidian/plugins/flashcards-obsidian/sync.log && echo '✓ test-vault reset. Reload Obsidian (Cmd/Ctrl+R) to pick up clean state.'",
     "check:test-vault-ids": "bash scripts/check-test-vault-ids.sh",
     "fixture-media": "node --experimental-strip-types scripts/gen-fixture-media.ts",
     "typecheck": "tsc --noEmit",
-    "version": "node version-bump.mjs && git add manifest.json versions.json"
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "test:native:scope": "node --experimental-strip-types scripts/native/scope-runner.ts"
   },
   "keywords": [
     "obsidian",

@@ -300,13 +300,10 @@ export function renderSyncScope(
         ?.focus();
   };
   search.addEventListener("input", render);
-  container.ownerDocument.addEventListener("flashcards-scope-changed", render);
+  const unsubscribe = plugin.onStateChange(render);
   render();
   return () => {
     disposed = true;
-    container.ownerDocument.removeEventListener(
-      "flashcards-scope-changed",
-      render,
-    );
+    unsubscribe();
   };
 }

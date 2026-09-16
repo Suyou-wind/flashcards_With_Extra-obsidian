@@ -54,3 +54,7 @@ CLAUDE.md
 /docs/v2-feature-plan.md
 /docs/v2-handoff.md
 /docs/v2-readiness.md
+
+# Native desktop integration test artifacts and run-owned fixtures
+.native-test-results/
+test-vault/scenarios/native-scope/

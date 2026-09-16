@@ -36,3 +36,14 @@ changes to commands, application use cases, and adapter behavior.
 
 The LikeC4 model is descriptive, not generated from source imports. Use
 `arch:check` for boundary enforcement and tests for runtime behavior.
+
+## Obsidian command flow
+
+`commands.ts` registers actions and handles style/syntax tools. `sync-command.ts`
+checks scope and migration, preserving the selected note across dialogs;
+`sync-execution.ts` runs sync with one settings snapshot and reports results.
+Deferred migration actions share the same lock and error handling as sync.
+
+UI editors subscribe through `PluginHost.onStateChange` and unsubscribe on
+close. The plugin publishes after saved settings or sync availability changes;
+subscriptions work across windows without document-global events.

@@ -41,7 +41,26 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
   set syncInFlight(value: boolean) {
     if (value === this.syncing) return;
     this.syncing = value;
-    document.dispatchEvent(new Event("flashcards-scope-changed"));
+    this.notifyStateChange();
+  }
+
+  private readonly stateListeners = new Set<() => void>();
+
+  onStateChange(listener: () => void): () => void {
+    this.stateListeners.add(listener);
+    return () => {
+      this.stateListeners.delete(listener);
+    };
+  }
+
+  private notifyStateChange(): void {
+    for (const listener of this.stateListeners) {
+      try {
+        listener();
+      } catch (error) {
+        this.logger.error("State listener failed", error);
+      }
+    }
   }
 
   private fileLogger: ObsidianFileLogger | undefined;
@@ -81,6 +100,7 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
   }
 
   override onunload(): void {
+    this.stateListeners.clear();
     this.logger.info("plugin unloading");
     // Obsidian calls `onunload` synchronously and ignores a returned promise,
     // so returning one only creates a floating promise nothing ever awaits.
@@ -119,7 +139,6 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
     }
     if (prev.syncScope !== this.settings.syncScope) {
       this.refreshStatusBars();
-      document.dispatchEvent(new Event("flashcards-scope-changed"));
     }
     if (
       prev.logLevel !== this.settings.logLevel ||
@@ -135,6 +154,7 @@ export default class FlashcardsPlugin extends Plugin implements PluginHost {
     if (prev.showRibbonIcon !== this.settings.showRibbonIcon && this.ribbonEl) {
       setRibbonVisibility(this.ribbonEl, this.settings.showRibbonIcon);
     }
+    this.notifyStateChange();
   }
 
   /** Called by commands after a sync completes. */

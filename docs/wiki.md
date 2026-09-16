@@ -465,23 +465,10 @@ style.
 
 ## Sync scope
 
-Use **Settings → Flashcards → Sync scope** to select included folders and
-exclude folders or individual notes. Empty includes means the whole vault.
-Folders cover all descendants; exclusions always override includes.
-
-For example, include `Study`, exclude `Study/Archive`, and exclude the note
-`Study/Draft.md`. `Study/Topic.md` syncs, but the archived notes and draft do
-not. `Study-old/Topic.md` is outside the included folder.
-
-Both sync commands and the ribbon respect these rules. An excluded current
-note shows its reason with an **Open sync settings** action. The settings
-picker supports multiple notes; note exclusions are searchable and grouped by
-folder. The note context menu edits the same settings.
-
-Excluding stops future processing and migration; existing Anki cards and note
-identity metadata remain. Explicit rules follow renames within a running
-Obsidian session. For details and troubleshooting, see the
-[sync scope guide](USAGE.md#choose-which-notes-sync).
+Include folders or exclude folders and individual notes in **Settings →
+Flashcards → Sync scope**. These rules apply to every sync command; existing
+Anki cards are kept. See the [scope guide](USAGE.md#choose-which-notes-sync)
+for precedence, examples, context menus, and rename behavior.
 
 ## Defaults
 

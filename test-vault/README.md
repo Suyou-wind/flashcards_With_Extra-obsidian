@@ -43,6 +43,19 @@ relevant note(s) and run the plugin commands
 | `sync-scope/` | Prefilled scope settings, UI, exclusions, and rename checks.                |
 | `issue-231/`  | Repros for issue #231: remote media and cloze contrast.                     |
 
+## Native automated scope checks
+
+With this vault open and your dedicated Anki `Test` profile active, run:
+
+```sh
+npm run test:native:scope -- --anki-profile=Test
+```
+
+The runner creates its own temporary notes, drives the actual Obsidian UI,
+verifies cards through AnkiConnect, and restores your settings afterwards.
+It leaves the prepared `scenarios/sync-scope/` notes unchanged. See
+[Native testing](../docs/NATIVE-TESTING.md) for requirements, reports, and cleanup.
+
 ## Features (automated)
 
 `features/` is a feature-coverage fixture exercised by

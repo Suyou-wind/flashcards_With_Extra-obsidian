@@ -21,3 +21,9 @@ exclusions from unchanged notes.
 
 See the [usage guide](../USAGE.md#choose-which-notes-sync) for rule precedence,
 examples, and troubleshooting.
+
+## Fixes
+
+- Keep the scope editor up to date when settings are in another window.
+- Report settings-save failures after migration dialogs and release the sync
+  lock so another attempt can run.

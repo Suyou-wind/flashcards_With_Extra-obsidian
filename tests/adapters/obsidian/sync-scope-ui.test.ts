@@ -74,6 +74,8 @@ afterEach(() => {
 });
 
 function host() {
+  const stateListeners = new Set<() => void>();
+  const notify = () => stateListeners.forEach((listener) => listener());
   const paths = ["Z/Note.md", "A/Zebra.md", "A/Alpha.md", "Root.md"];
   const listeners: Record<string, (...args: never[]) => void> = {};
   const on = vi.fn((name: string, callback: (...args: never[]) => void) => {
@@ -93,6 +95,12 @@ function host() {
     },
     settings: structuredClone(DEFAULT_SETTINGS),
     syncInFlight: false,
+    onStateChange(listener: () => void) {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
     registerEvent: vi.fn(),
     refreshStatusBars: vi.fn(),
     logger: { error: vi.fn() },
@@ -100,7 +108,7 @@ function host() {
       plugin.settings = { ...plugin.settings, ...next };
     }),
   } as unknown as PluginHost;
-  return { plugin, listeners };
+  return { plugin, listeners, notify };
 }
 function mount(plugin: PluginHost) {
   const el = document.createElement("div");
@@ -213,10 +221,10 @@ describe("sync scope editor", () => {
     mocks.modals[0]!.close();
   });
   it("refreshes an open modal when exclusions change elsewhere", async () => {
-    const { plugin } = host();
+    const { plugin, notify } = host();
     openSyncScope(plugin);
     plugin.settings.syncScope.excludedNotes = ["Root.md"];
-    document.dispatchEvent(new Event("flashcards-scope-changed"));
+    notify();
     expect(mocks.modals[0]!.contentEl.textContent).toContain(
       "Excluded notes (1)",
     );
@@ -273,4 +281,35 @@ it("context menu exclusions and rapid rename events share persisted settings", a
   await vi.waitFor(() =>
     expect(plugin.settings.syncScope.excludedNotes).toEqual(["C/Alpha.md"]),
   );
+});
+
+it("refreshes a settings editor hosted in another window's document", () => {
+  const { plugin, notify } = host();
+  const popupDocument = document.implementation.createHTMLDocument("Settings");
+  const el = popupDocument.createElement("div");
+  popupDocument.body.append(el);
+  disposers.push(renderSyncScope(el, plugin));
+  plugin.settings.syncScope.excludedNotes = ["Root.md"];
+  notify();
+  expect(el.textContent).toContain("Excluded notes (1)");
+});
+
+it("updates busy controls and stops listening when the editor closes", () => {
+  const { plugin, notify } = host();
+  const el = document.createElement("div");
+  const dispose = renderSyncScope(el, plugin);
+  plugin.syncInFlight = true;
+  notify();
+  expect(
+    [...el.querySelectorAll("button")].every((button) => button.disabled),
+  ).toBe(true);
+  plugin.syncInFlight = false;
+  notify();
+  expect(
+    [...el.querySelectorAll("button")].every((button) => !button.disabled),
+  ).toBe(true);
+  dispose();
+  plugin.settings.syncScope.excludedNotes = ["Root.md"];
+  notify();
+  expect(el.textContent).toContain("Excluded notes (0)");
 });

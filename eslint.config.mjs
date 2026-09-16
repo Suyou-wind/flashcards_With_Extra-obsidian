@@ -21,11 +21,8 @@ export default defineConfig(
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
-  // Obsidian's own guideline rules — the same set the community plugin
-  // scorecard runs against a release. Keeping them here means a regression
-  // fails `npm run check` instead of surfacing on the public plugin page.
-  // Scoped to what actually ships (src/ + the two manifests); tests, scripts
-  // and build config are not part of the reviewed artifact.
+  // Recommended Obsidian guidelines; npm run lint also fails on warnings.
+  // Apply to shipping source and package metadata, not test/build tooling.
   {
     files: ["src/**/*.ts", "package.json"],
     extends: [obsidianmd.configs.recommended],

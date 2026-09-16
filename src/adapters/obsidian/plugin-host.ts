@@ -18,6 +18,8 @@ export interface PluginHost extends Plugin {
   settings: FlashcardsSettings;
   logger: Logger;
   syncInFlight: boolean;
+  /** Settings or sync availability changed; returns an unsubscribe function. */
+  onStateChange(listener: () => void): () => void;
   updateSettings(next: Partial<FlashcardsSettings>): Promise<void>;
   /** Called by commands after a sync completes. */
   refreshStatusBars(): void;

@@ -1,3 +1,4 @@
+import type { MigrationModalOptions } from "../../../src/adapters/obsidian/migration-modal.js";
 import type * as ScopeUI from "../../../src/adapters/obsidian/sync-scope-ui.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,6 +25,8 @@ const mocks = vi.hoisted(() => ({
   confirmAnkiStyle: vi.fn(),
   syntaxMigrationModals: [] as Array<{ items: unknown[] }>,
   syncNote: vi.fn(),
+  backfillV1Vault: vi.fn(),
+  migrationModals: [] as MigrationModalOptions[],
 }));
 
 // Obsidian plugin code runs in a browser realm and uses `window` timers; the
@@ -48,10 +51,13 @@ vi.mock("obsidian", () => ({
   },
 }));
 
-vi.mock("../../../src/adapters/obsidian/sync-scope-ui.js", async (importOriginal) => ({
-  ...await importOriginal<typeof ScopeUI>(),
-  showScopeExclusion: mocks.showScopeExclusion,
-}));
+vi.mock(
+  "../../../src/adapters/obsidian/sync-scope-ui.js",
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof ScopeUI>()),
+    showScopeExclusion: mocks.showScopeExclusion,
+  }),
+);
 
 vi.mock("../../../src/adapters/anki/anki-connect-client.js", () => ({
   AnkiConnectClient: class {
@@ -69,9 +75,12 @@ vi.mock("../../../src/adapters/obsidian/anki-launcher.js", () => ({
 vi.mock("../../../src/adapters/anki/upload-media.js", () => ({
   uploadMedia: vi.fn(),
 }));
-vi.mock("../../../src/adapters/anki/repair-managed-source-templates.js", () => ({
-  repairManagedSourceTemplates: mocks.repairManagedSourceTemplates,
-}));
+vi.mock(
+  "../../../src/adapters/anki/repair-managed-source-templates.js",
+  () => ({
+    repairManagedSourceTemplates: mocks.repairManagedSourceTemplates,
+  }),
+);
 vi.mock("../../../src/adapters/anki/manage-managed-model-style.js", () => ({
   applyManagedModelStyle: mocks.applyManagedModelStyle,
   inspectManagedModelStyle: mocks.inspectManagedModelStyle,
@@ -82,13 +91,16 @@ vi.mock("../../../src/adapters/obsidian/anki-style-backup.js", () => ({
 vi.mock("../../../src/adapters/obsidian/anki-style-confirm-modal.js", () => ({
   createAnkiStyleConfirmer: vi.fn(() => mocks.confirmAnkiStyle),
 }));
-vi.mock("../../../src/adapters/obsidian/obsidian-markdown-repository.js", () => ({
-  ObsidianMarkdownRepository: class {
-    getActiveNote = mocks.getActiveNote;
-    listMarkdownNotes = async () => mocks.getAllMarkdownNotes();
-    getAllMarkdownNotes = mocks.getAllMarkdownNotes;
-  },
-}));
+vi.mock(
+  "../../../src/adapters/obsidian/obsidian-markdown-repository.js",
+  () => ({
+    ObsidianMarkdownRepository: class {
+      getActiveNote = mocks.getActiveNote;
+      listMarkdownNotes = async () => mocks.getAllMarkdownNotes();
+      getAllMarkdownNotes = mocks.getAllMarkdownNotes;
+    },
+  }),
+);
 vi.mock("../../../src/adapters/obsidian/media-resolver.js", () => ({
   buildMediaRewriteMap: vi.fn(() => new Map()),
   resolveMedia: vi.fn(async () => ({ errors: [], resolved: new Map() })),
@@ -99,11 +111,17 @@ vi.mock("../../../src/adapters/obsidian/wikilink-resolver.js", () => ({
 vi.mock("../../../src/adapters/obsidian/delete-confirm-modal.js", () => ({
   createDeleteConfirmer: vi.fn(),
 }));
-vi.mock("../../../src/adapters/obsidian/kind-recreation-confirm-modal.js", () => ({
-  createKindRecreationConfirmer: vi.fn(() => vi.fn()),
-}));
+vi.mock(
+  "../../../src/adapters/obsidian/kind-recreation-confirm-modal.js",
+  () => ({
+    createKindRecreationConfirmer: vi.fn(() => vi.fn()),
+  }),
+);
 vi.mock("../../../src/adapters/obsidian/migration-modal.js", () => ({
   MigrationModal: class {
+    constructor(_app: unknown, options: MigrationModalOptions) {
+      mocks.migrationModals.push(options);
+    }
     open = vi.fn();
   },
 }));
@@ -114,6 +132,9 @@ vi.mock("../../../src/adapters/obsidian/syntax-migration-modal.js", () => ({
     }
     open = vi.fn();
   },
+}));
+vi.mock("../../../src/application/backfill-v1-vault.js", () => ({
+  backfillV1Vault: mocks.backfillV1Vault,
 }));
 vi.mock("../../../src/application/sync-note.js", () => ({
   syncNote: mocks.syncNote,
@@ -152,7 +173,9 @@ function createHost() {
           id === "flashcards-anki-key" ? "secret-value" : null,
         ),
       },
-      workspace: { getActiveFile: () => ({ extension: "md", path: "Note.md" }) },
+      workspace: {
+        getActiveFile: () => ({ extension: "md", path: "Note.md" }),
+      },
     },
     logger,
     manifest: {
@@ -196,24 +219,41 @@ function createHost() {
 }
 
 describe("Obsidian sync commands", () => {
-  it.each(["command", "ribbon"])("explains folder exclusion before migration or Anki from %s", async (entry) => {
-    const { host, current, actions } = createHost();
-    host.settings.v1MigrationDecisionMade = false;
-    host.settings.syncScope.excludedFolders = ["Archive"];
-    host.app.workspace.getActiveFile = () => ({ extension: "md", path: "Archive/Note.md" }) as never;
-    if (entry === "command") current.checkCallback!(false); else actions.updateAnkiFromCurrentNote();
-    await vi.waitFor(() => expect(mocks.showScopeExclusion).toHaveBeenCalledWith(host, { kind: "folder", path: "Archive" }));
-    expect(mocks.getAllMarkdownNotes).not.toHaveBeenCalled();
-    expect(mocks.getActiveNote).not.toHaveBeenCalled();
-    expect(mocks.ankiVersion).not.toHaveBeenCalled();
-    expect(mocks.launchAnkiCommand).not.toHaveBeenCalled();
-    expect(mocks.syncNote).not.toHaveBeenCalled();
-  });
+  it.each(["command", "ribbon"])(
+    "explains folder exclusion before migration or Anki from %s",
+    async (entry) => {
+      const { host, current, actions } = createHost();
+      host.settings.v1MigrationDecisionMade = false;
+      host.settings.syncScope.excludedFolders = ["Archive"];
+      host.app.workspace.getActiveFile = () =>
+        ({ extension: "md", path: "Archive/Note.md" }) as never;
+      if (entry === "command") current.checkCallback!(false);
+      else actions.updateAnkiFromCurrentNote();
+      await vi.waitFor(() =>
+        expect(mocks.showScopeExclusion).toHaveBeenCalledWith(host, {
+          kind: "folder",
+          path: "Archive",
+        }),
+      );
+      expect(mocks.getAllMarkdownNotes).not.toHaveBeenCalled();
+      expect(mocks.getActiveNote).not.toHaveBeenCalled();
+      expect(mocks.ankiVersion).not.toHaveBeenCalled();
+      expect(mocks.launchAnkiCommand).not.toHaveBeenCalled();
+      expect(mocks.syncNote).not.toHaveBeenCalled();
+    },
+  );
 
   it("reports an empty sync scope without contacting Anki", async () => {
     const { commands } = createHost();
-    commands.find((command) => command.id === "flashcards-sync-vault")!.callback!();
-    await vi.waitFor(() => expect(mocks.notices.some((notice) => notice.message === "No notes match your sync scope.")).toBe(true));
+    commands.find((command) => command.id === "flashcards-sync-vault")!
+      .callback!();
+    await vi.waitFor(() =>
+      expect(
+        mocks.notices.some(
+          (notice) => notice.message === "No notes match your sync scope.",
+        ),
+      ).toBe(true),
+    );
     expect(mocks.ankiVersion).not.toHaveBeenCalled();
   });
 
@@ -236,6 +276,12 @@ describe("Obsidian sync commands", () => {
     mocks.launchAnkiCommand.mockReset();
     mocks.launchAnkiCommand.mockResolvedValue(undefined);
     mocks.syntaxMigrationModals.length = 0;
+    mocks.migrationModals.length = 0;
+    mocks.backfillV1Vault.mockReset();
+    mocks.backfillV1Vault.mockResolvedValue({
+      totalBackfilledCount: 1,
+      notesUpdated: 1,
+    });
     mocks.syncNote.mockReset();
     mocks.inspectManagedModelStyle.mockReset();
     mocks.inspectManagedModelStyle.mockResolvedValue({
@@ -250,13 +296,92 @@ describe("Obsidian sync commands", () => {
     mocks.confirmAnkiStyle.mockResolvedValue(false);
   });
 
+  it.each(["onSkip", "onMigrate"] as const)(
+    "reports persistence failures after migration action %s and releases the lock",
+    async (action) => {
+      const { host, current, refreshStatusBars } = createHost();
+      host.settings.v1MigrationDecisionMade = false;
+      mocks.getAllMarkdownNotes.mockResolvedValue([
+        {
+          file: {},
+          markdown: "Question::Answer ^1700000000001\n",
+          name: "Note",
+          path: "Note.md",
+        },
+      ]);
+      vi.mocked(host.updateSettings).mockRejectedValue(
+        new Error("Settings disk full"),
+      );
+      current.checkCallback!(false);
+      await vi.waitFor(() => expect(mocks.migrationModals).toHaveLength(1));
+      expect(host.syncInFlight).toBe(false);
+      mocks.migrationModals[0]![action]();
+      await vi.waitFor(() =>
+        expect(mocks.notices.map((notice) => notice.message)).toContain(
+          "Sync failed: Settings disk full",
+        ),
+      );
+      expect(host.syncInFlight).toBe(false);
+      expect(refreshStatusBars).toHaveBeenCalledTimes(2);
+      expect(mocks.ankiVersion).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rechecks the originally selected note after a migration dialog", async () => {
+    const { host, current } = createHost();
+    host.settings.v1MigrationDecisionMade = false;
+    mocks.getAllMarkdownNotes.mockResolvedValue([
+      {
+        file: {},
+        markdown: "Question::Answer ^1700000000001\n",
+        name: "Note",
+        path: "Note.md",
+      },
+    ]);
+    current.checkCallback!(false);
+    await vi.waitFor(() => expect(mocks.migrationModals).toHaveLength(1));
+    host.app.workspace.getActiveFile = () =>
+      ({ extension: "md", path: "Other.md" }) as never;
+    host.settings.syncScope.excludedNotes = ["Note.md"];
+    mocks.migrationModals[0]!.onSkip();
+    await vi.waitFor(() =>
+      expect(mocks.showScopeExclusion).toHaveBeenCalledWith(host, {
+        kind: "note",
+        path: "Note.md",
+      }),
+    );
+    expect(mocks.ankiVersion).not.toHaveBeenCalled();
+    expect(mocks.syncNote).not.toHaveBeenCalled();
+  });
+
+  it("uses one settings snapshot while waiting for Anki", async () => {
+    const { host, current } = createHost();
+    const settings = host.settings;
+    mocks.ankiVersion.mockImplementation(async () => {
+      host.settings = { ...host.settings, defaultDeck: "Changed during sync" };
+      return 6;
+    });
+    mocks.getActiveNote.mockResolvedValue({
+      file: {},
+      markdown: "Q::A",
+      name: "Note",
+      path: "Note.md",
+    });
+    mocks.syncNote.mockResolvedValue({
+      status: "skipped",
+      notePath: "Note.md",
+    });
+    current.checkCallback!(false);
+    await vi.waitFor(() => expect(mocks.syncNote).toHaveBeenCalledOnce());
+    expect(mocks.syncNote.mock.calls[0]![0].settings).toBe(settings);
+  });
+
   it("names update commands after their one-way Anki destination", () => {
     const { commands } = createHost();
 
     expect(
-      commands.find(
-        (command) => command.id === "flashcards-sync-current-note",
-      )?.name,
+      commands.find((command) => command.id === "flashcards-sync-current-note")
+        ?.name,
     ).toBe("Update Anki from current note");
     expect(
       commands.find((command) => command.id === "flashcards-sync-vault")?.name,
@@ -363,7 +488,9 @@ describe("Obsidian sync commands", () => {
 
     ankiStyle.callback?.();
 
-    await vi.waitFor(() => expect(mocks.applyManagedModelStyle).toHaveBeenCalled());
+    await vi.waitFor(() =>
+      expect(mocks.applyManagedModelStyle).toHaveBeenCalled(),
+    );
     expect(order).toEqual(["backup", "apply"]);
     expect(host.syncInFlight).toBe(false);
     expect(refreshStatusBars).toHaveBeenCalledOnce();
