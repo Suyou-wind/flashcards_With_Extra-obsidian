@@ -120,7 +120,7 @@ export function bootAllV2(
   return [
     ok(modelNames),
     ok(["Front", "Back", "Context", "Source"]),
-    ok(["Front", "Back", "Context", "Source"]),
+    ok(["Front", "Back", "Extra", "Context", "Source"]),
     ok(["Text", "Extra", "Context", "Source"]),
     ok(["Content", "Context", "Source"]),
   ];

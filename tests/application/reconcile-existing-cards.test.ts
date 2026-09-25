@@ -389,11 +389,13 @@ describe("syncNote — stale nid recovery", () => {
       deckNames: vi.fn(async () => ["Default"]),
       deleteNotes: vi.fn(async () => undefined),
       modelFieldAdd: vi.fn(async () => undefined),
-      modelFieldNames: vi.fn(async (name: string) =>
-        name.endsWith("cloze")
-          ? ["Text", "Extra", "Context", "Source"]
-          : ["Front", "Back", "Context", "Source"],
-      ),
+      modelFieldNames: vi.fn(async (name: string) => {
+        if (name.endsWith("cloze")) return ["Text", "Extra", "Context", "Source"];
+        if (name.endsWith("reversed")) {
+          return ["Front", "Back", "Extra", "Context", "Source"];
+        }
+        return ["Front", "Back", "Context", "Source"];
+      }),
       modelNames: vi.fn(async () => [
         "Obsidian-basic",
         "Obsidian-basic-reversed",

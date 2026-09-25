@@ -62,6 +62,10 @@ type: reversed
 `type` is optional and defaults to `basic`. Supported values are `basic`,
 `reversed`, `cloze`, and `reminder`.
 
+A reversed fence can add an optional `extra:` field. Its text appears on the
+back of both generated cards, below the answer. It is ignored with a warning on
+other types, and an empty `extra:` is treated as absent.
+
 A cloze fence uses `front` as Anki's Text field. Its optional `back` becomes
 Extra. A reminder fence uses one `content` field:
 

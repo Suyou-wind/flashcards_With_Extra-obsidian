@@ -130,12 +130,34 @@ type: basic
 ````
 
 **Reserved-key caveat:** a continuation line that itself begins with
-`front:`, `back:`, `content:`, or `type:` starts that key instead of being
-read as content. To include such a line verbatim in a value, reword it so it
-does not begin with a reserved key.
+`front:`, `back:`, `content:`, `extra:`, or `type:` starts that key instead of
+being read as content. To include such a line verbatim in a value, reword it so
+it does not begin with a reserved key.
 
 If `front:` or `back:` is missing or empty, no card is produced and a
 warning is logged.
+
+**Extra (reversed cards only):** a fenced reversed card can carry an optional
+`extra:` field. Its text appears on the back of both generated cards, below the
+answer:
+
+````markdown
+```flashcard
+front: TCP
+back: Transmission Control Protocol
+type: reversed
+extra: Connection-oriented, reliable, ordered delivery over IP.
+```
+````
+
+`extra:` is recognised only on `type: reversed` cards. On any other type it is
+ignored with a warning, and an empty `extra:` is treated as absent. It follows
+the same multi-line and reserved-key rules as `front:` and `back:`. The
+`extra:` text never appears on the question side of either card.
+
+This mirrors yanki's optional "extra" content, but in a note form that also
+supports many cards per file — one file can hold any number of reversed cards,
+each with its own `extra:`.
 
 ### Hashtag (`#card`)
 

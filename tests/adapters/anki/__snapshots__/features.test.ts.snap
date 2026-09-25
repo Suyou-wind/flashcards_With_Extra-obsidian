@@ -8,6 +8,7 @@ exports[`test-vault/features snapshot coverage > renders card-types/atomic/chunk
       "Back": "<p>Grouping individual items into larger meaningful units so that working memory
 holds more material without holding more elements.</p>",
       "Context": "",
+      "Extra": "",
       "Front": "<p>chunking</p>",
       "Source": "<a class="flashcards-source" href="obsidian://open?vault=Vault&file=card-types%2Fatomic%2Fchunking.md#%5Ecard-0"><span class="flashcards-source-action">Edit source in Obsidian ↗</span><br><small class="flashcards-source-path">card-types/atomic/chunking</small></a>",
     },
@@ -199,6 +200,7 @@ exports[`test-vault/features snapshot coverage > renders card-types/fenced-rever
     "fields": {
       "Back": "<p>Transmission Control Protocol</p>",
       "Context": "<p>Fenced reversed</p>",
+      "Extra": "",
       "Front": "<p>TCP</p>",
       "Source": "<a class="flashcards-source" href="obsidian://open?vault=Vault&file=card-types%2Ffenced-reversed.md#%5Ecard-0"><span class="flashcards-source-action">Edit source in Obsidian ↗</span><br><small class="flashcards-source-path">card-types/fenced-reversed</small></a>",
     },
@@ -256,6 +258,7 @@ exports[`test-vault/features snapshot coverage > renders card-types/inline-rever
     "fields": {
       "Back": "<p>Four.</p>",
       "Context": "<p>Inline reversed</p>",
+      "Extra": "",
       "Front": "<p>What is 2 + 2?</p>",
       "Source": "<a class="flashcards-source" href="obsidian://open?vault=Vault&file=card-types%2Finline-reversed.md#%5Ecard-0"><span class="flashcards-source-action">Edit source in Obsidian ↗</span><br><small class="flashcards-source-path">card-types/inline-reversed</small></a>",
     },
@@ -509,6 +512,7 @@ exports[`test-vault/features snapshot coverage > renders interactions/image-in-r
     "fields": {
       "Back": "<p>The flag of France.</p>",
       "Context": "<p>Image in reversed</p>",
+      "Extra": "",
       "Front": "<img src="760b5ea4a888728b0697120e6a87662fbddfabd0.png">",
       "Source": "<a class="flashcards-source" href="obsidian://open?vault=Vault&file=interactions%2Fimage-in-reversed.md#%5Ecard-0"><span class="flashcards-source-action">Edit source in Obsidian ↗</span><br><small class="flashcards-source-path">interactions/image-in-reversed</small></a>",
     },

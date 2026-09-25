@@ -1,4 +1,7 @@
-import { getAnkiModelSpecs } from "../../core/render/render-card.js";
+import {
+  ANKI_MODEL_REVERSED,
+  getAnkiModelSpecs,
+} from "../../core/render/render-card.js";
 import type {
   AnkiConnectClient,
   AnkiModelTemplates,
@@ -19,6 +22,7 @@ export interface ManagedModelStyleChange {
   current: ManagedModelStyleSnapshot;
   desired: ManagedModelStyleTarget;
   missingContext: boolean;
+  missingExtra: boolean;
   missingSource: boolean;
   modelName: string;
 }
@@ -51,7 +55,10 @@ export async function inspectManagedModelStyle(
     const templates = await client.modelTemplates(spec.modelName);
     const { css } = await client.modelStyling(spec.modelName);
     const requiredContentFields = spec.inOrderFields.filter(
-      (field) => field !== "Context" && field !== "Source",
+      (field) =>
+        field !== "Context" &&
+        field !== "Source" &&
+        !(field === "Extra" && spec.modelName === ANKI_MODEL_REVERSED),
     );
     const missingContentFields = requiredContentFields.filter(
       (field) => !fields.includes(field),
@@ -87,10 +94,13 @@ export async function inspectManagedModelStyle(
 
     const missingSource = !fields.includes("Source");
     const missingContext = !fields.includes("Context");
+    const missingExtra =
+      spec.modelName === ANKI_MODEL_REVERSED && !fields.includes("Extra");
     const desired = { css: spec.css ?? "", templates: desiredTemplates };
     if (
       !missingContext &&
       !missingSource &&
+      !missingExtra &&
       css === desired.css &&
       templatesEqual(templates, desired.templates)
     ) {
@@ -101,6 +111,7 @@ export async function inspectManagedModelStyle(
       current: { css, fields, templates },
       desired,
       missingContext,
+      missingExtra,
       missingSource,
       modelName: spec.modelName,
     });
@@ -116,6 +127,12 @@ export async function applyManagedModelStyle(
 ): Promise<void> {
   for (const change of plan.changes) {
     const nextFields = [...change.current.fields];
+    if (change.missingExtra) {
+      const backIndex = nextFields.indexOf("Back");
+      const extraIndex = backIndex === -1 ? nextFields.length : backIndex + 1;
+      await client.modelFieldAdd(change.modelName, "Extra", extraIndex);
+      nextFields.splice(extraIndex, 0, "Extra");
+    }
     if (change.missingContext) {
       const sourceIndex = nextFields.indexOf("Source");
       const contextIndex = sourceIndex === -1 ? nextFields.length : sourceIndex;

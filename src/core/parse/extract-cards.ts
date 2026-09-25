@@ -158,6 +158,7 @@ export function extractCardsFromMarkdown(
         ? fields.content ?? ""
         : fields.front ?? "";
       const back = fields.back ?? "";
+      const extra = fields.extra === "" ? undefined : fields.extra;
       const type = fields.type || "basic";
 
       if (
@@ -180,6 +181,11 @@ export function extractCardsFromMarkdown(
           "Fenced flashcard block missing required `back:` field; skipped.",
         );
       } else {
+        if (extra !== undefined && type !== "reversed") {
+          warnings.push(
+            "Fenced flashcard block has `extra:` but type is not `reversed`; extra is ignored.",
+          );
+        }
         cards.push({
           answer: back,
           deckName: resolvedDeck,
@@ -198,6 +204,7 @@ export function extractCardsFromMarkdown(
             syntax: "fenced",
           },
           tags: resolvedTags,
+          ...(extra !== undefined && type === "reversed" ? { extra } : {}),
         });
       }
     }
@@ -607,11 +614,12 @@ function collectNodeRanges(tree: Root, type: Nodes["type"]): Span[] {
 interface FencedFields {
   back?: string;
   content?: string;
+  extra?: string;
   front?: string;
   type?: string;
 }
 
-const FENCED_KEY_RE = /^(front|back|content|type):(.*)$/;
+const FENCED_KEY_RE = /^(front|back|content|extra|type):(.*)$/;
 
 /**
  * A field value spans the text after `key:` plus every following line until the

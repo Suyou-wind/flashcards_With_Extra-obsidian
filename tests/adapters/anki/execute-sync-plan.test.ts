@@ -144,7 +144,7 @@ const ALL_MODELS = [ANKI_MODEL_BASIC, ANKI_MODEL_REVERSED, ANKI_MODEL_CLOZE, ANK
 // `Source` present means the extend-in-place upgrade is a no-op.
 const V2_FIELDS: Record<string, string[]> = {
   [ANKI_MODEL_BASIC]: ["Front", "Back", "Context", "Source"],
-  [ANKI_MODEL_REVERSED]: ["Front", "Back", "Context", "Source"],
+  [ANKI_MODEL_REVERSED]: ["Front", "Back", "Extra", "Context", "Source"],
   [ANKI_MODEL_CLOZE]: ["Text", "Extra", "Context", "Source"],
   [ANKI_MODEL_REMINDER]: ["Content", "Context", "Source"],
 };
@@ -325,7 +325,7 @@ describe("executeSyncPlan — bootstrap models", () => {
       ok(null), ok(null), ok(null), // extend basic
       ok(["Front", "Back"]), // reversed
       ok({ "Card 1": { Back: "{{Back}}", Front: "{{Front}}" } }),
-      ok(null), ok(null), ok(null), // extend reversed
+      ok(null), ok(null), ok(null), ok(null), // extend reversed
       ok(["Text", "Extra"]), // cloze
       ok({ "Card 1": { Back: "{{cloze:Text}}", Front: "{{cloze:Text}}" } }),
       ok(null), ok(null), ok(null), // extend cloze
@@ -353,6 +353,7 @@ describe("executeSyncPlan — bootstrap models", () => {
       "modelTemplates",
       "modelFieldAdd",
       "modelFieldAdd",
+      "modelFieldAdd",
       "updateModelTemplates",
       "modelFieldNames",
       "modelTemplates",
@@ -365,7 +366,7 @@ describe("executeSyncPlan — bootstrap models", () => {
       "modelFieldAdd",
       "updateModelTemplates",
     ]);
-    expect((calls[13]!.params as { modelName: string }).modelName).toBe(
+    expect((calls[14]!.params as { modelName: string }).modelName).toBe(
       ANKI_MODEL_CLOZE,
     );
   });

@@ -859,6 +859,74 @@ describe("extractCardsFromMarkdown", () => {
         true,
       );
     });
+
+    test("captures an extra: field on a reversed card", () => {
+      const result = extractCardsFromMarkdown(
+        [
+          "```flashcard",
+          "front: Capital of France?",
+          "back: Paris",
+          "type: reversed",
+          "extra: Also the home of the Louvre.",
+          "```",
+        ].join("\n"),
+        { notePath: "Extra.md", settings: DEFAULT_SETTINGS },
+      );
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0]).toMatchObject({
+        front: "Capital of France?",
+        answer: "Paris",
+        kind: "reversed",
+        extra: "Also the home of the Louvre.",
+      });
+      expect(result.warnings).not.toContain(
+        "Fenced flashcard block has `extra:` but type is not `reversed`; extra is ignored.",
+      );
+    });
+
+    test("warns and ignores an extra: field on a non-reversed card", () => {
+      const result = extractCardsFromMarkdown(
+        [
+          "```flashcard",
+          "front: What is ATP?",
+          "back: Adenosine triphosphate",
+          "type: basic",
+          "extra: This is ignored.",
+          "```",
+        ].join("\n"),
+        { notePath: "ExtraBasic.md", settings: DEFAULT_SETTINGS },
+      );
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0]).toMatchObject({
+        front: "What is ATP?",
+        answer: "Adenosine triphosphate",
+        kind: "basic",
+      });
+      expect(result.cards[0]).not.toHaveProperty("extra");
+      expect(result.warnings).toContain(
+        "Fenced flashcard block has `extra:` but type is not `reversed`; extra is ignored.",
+      );
+    });
+
+    test("treats an empty extra: field as absent (no extra on the card)", () => {
+      const result = extractCardsFromMarkdown(
+        [
+          "```flashcard",
+          "front: Capital of France?",
+          "back: Paris",
+          "type: reversed",
+          "extra:",
+          "```",
+        ].join("\n"),
+        { notePath: "EmptyExtra.md", settings: DEFAULT_SETTINGS },
+      );
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0]).toMatchObject({ kind: "reversed" });
+      expect(result.cards[0]).not.toHaveProperty("extra");
+    });
   });
 
   // B5: markdown-form images `![alt](file.png)` were stripped from visible

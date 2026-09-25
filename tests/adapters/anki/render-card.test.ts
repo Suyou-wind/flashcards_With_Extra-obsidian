@@ -126,20 +126,20 @@ describe("getAnkiModelSpecs", () => {
     const spec = getAnkiModelSpecs().find(
       (s) => s.modelName === ANKI_MODEL_REVERSED,
     )!;
-    expect(spec.inOrderFields).toEqual(["Front", "Back", "Context", "Source"]);
+    expect(spec.inOrderFields).toEqual(["Front", "Back", "Extra", "Context", "Source"]);
     expect(spec.isCloze).toBe(false);
     expect(spec.cardTemplates).toHaveLength(2);
     expect(spec.cardTemplates[0]!.Front).toBe(
       `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{Front}}</section>`,
     );
     expect(spec.cardTemplates[0]!.Back).toBe(
-      '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Back}}</section><footer class="flashcards-source-footer">{{Source}}</footer>',
+      '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Back}}</section>{{#Extra}}<hr class="flashcards-answer-divider"><section class="flashcards-extra">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>',
     );
     expect(spec.cardTemplates[1]!.Front).toBe(
       `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{Back}}</section>`,
     );
     expect(spec.cardTemplates[1]!.Back).toBe(
-      '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Front}}</section><footer class="flashcards-source-footer">{{Source}}</footer>',
+      '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Front}}</section>{{#Extra}}<hr class="flashcards-answer-divider"><section class="flashcards-extra">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>',
     );
   });
 
@@ -447,14 +447,32 @@ describe("renderCardForAnki — reversed", () => {
     expect(Object.keys(out.fields).sort()).toEqual([
       "Back",
       "Context",
+      "Extra",
       "Front",
       "Source",
     ]);
     expect(out.fields.Context).toBe("<p>Image in reversed</p>");
     expect(out.fields.Front).toBe("<p>![[flag.png]]</p>");
     expect(out.fields.Back).toBe("<p>The flag of France.</p>");
+    expect(out.fields.Extra).toBe("");
     expect(out.fields.Front).not.toContain("Image in reversed");
     expect(out.fields.Back).not.toContain("Image in reversed");
+  });
+
+  it("renders optional extra content into the Extra field (back of both cards)", () => {
+    const out = renderCardForAnki(
+      baseCard({
+        answer: "The flag of France.",
+        extra: "Tricolour: blue, white, red.",
+        front: "France",
+        kind: "reversed",
+      }),
+      CTX,
+    );
+    expect(out.modelName).toBe(ANKI_MODEL_REVERSED);
+    expect(out.fields.Extra).toBe("<p>Tricolour: blue, white, red.</p>");
+    expect(out.fields.Front).toBe("<p>France</p>");
+    expect(out.fields.Back).toBe("<p>The flag of France.</p>");
   });
 });
 

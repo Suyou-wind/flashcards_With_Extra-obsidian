@@ -27,6 +27,7 @@ describe("writeAnkiStyleBackup", () => {
           },
           desired: { css: "new", templates: {} },
           missingContext: true,
+          missingExtra: false,
           missingSource: true,
           modelName: "Obsidian-basic",
         },

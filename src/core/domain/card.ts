@@ -19,6 +19,8 @@ export interface Flashcard {
   /** Prompt context such as the active heading path. Never answer content. */
   context?: string;
   deckName?: string;
+  /** Reversed cards only: optional content shown on the back of both cards. */
+  extra?: string;
   front: string;
   kind: CardKind;
   source: CardSource;

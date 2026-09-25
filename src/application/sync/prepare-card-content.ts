@@ -85,6 +85,9 @@ export async function prepareCardContent(
         ...(card.context !== undefined
           ? { context: rewriteMedia(card.context, media.rewriteMap) }
           : {}),
+        ...(card.extra !== undefined
+          ? { extra: rewriteMedia(card.extra, media.rewriteMap) }
+          : {}),
         front: rewriteMedia(card.front, media.rewriteMap),
       },
     ]),

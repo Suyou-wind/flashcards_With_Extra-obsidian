@@ -159,6 +159,7 @@ describe("applyManagedModelStyle", () => {
           },
           desired: { css: spec.css!, templates: desiredTemplates },
           missingContext: true,
+          missingExtra: false,
           missingSource: true,
           modelName: ANKI_MODEL_BASIC,
         },

@@ -65,6 +65,7 @@ const DEFAULT_CSS = `/* flashcards-obsidian-managed:start */
 .flashcards-reminder-guidance,
 .flashcards-context,
 .flashcards-answer,
+.flashcards-extra,
 .flashcards-source-footer,
 .flashcards-answer-divider {
   width: min(100%, 700px);
@@ -106,6 +107,11 @@ const DEFAULT_CSS = `/* flashcards-obsidian-managed:start */
   margin-bottom: 2rem;
   border: 0;
   border-top: 2px solid var(--flashcards-accent);
+}
+
+.flashcards-extra {
+  color: var(--flashcards-muted);
+  font-size: 0.92em;
 }
 
 .flashcards-source-footer {
@@ -210,8 +216,12 @@ const BASIC_FRONT_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards
 const BASIC_BACK_TEMPLATE =
   '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Back}}</section><footer class="flashcards-source-footer">{{Source}}</footer>';
 const REVERSED_FRONT_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{Back}}</section>`;
+export const EXTRA_TEMPLATE =
+  '{{#Extra}}<hr class="flashcards-answer-divider"><section class="flashcards-extra">{{Extra}}</section>{{/Extra}}';
+const REVERSED_CARD1_BACK_TEMPLATE =
+  `{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Back}}</section>${EXTRA_TEMPLATE}<footer class="flashcards-source-footer">{{Source}}</footer>`;
 const REVERSED_BACK_TEMPLATE =
-  '{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Front}}</section><footer class="flashcards-source-footer">{{Source}}</footer>';
+  `{{FrontSide}}<hr id="answer" class="flashcards-answer-divider"><section class="flashcards-answer">{{Front}}</section>${EXTRA_TEMPLATE}<footer class="flashcards-source-footer">{{Source}}</footer>`;
 const CLOZE_FRONT_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>`;
 // Cloze answers appear within Text; an answer ID would scroll away to Extra.
 const CLOZE_BACK_TEMPLATE = `${ANKI_CONTEXT_TEMPLATE}<section class="flashcards-question">{{cloze:Text}}</section>{{#Extra}}<hr class="flashcards-answer-divider"><section class="flashcards-answer">{{Extra}}</section>{{/Extra}}<footer class="flashcards-source-footer">{{Source}}</footer>`;
@@ -268,14 +278,14 @@ export function getAnkiModelSpecs(): AnkiCreateModelSpec[] {
     },
     {
       modelName: ANKI_MODEL_REVERSED,
-      inOrderFields: ["Front", "Back", "Context", "Source"],
+      inOrderFields: ["Front", "Back", "Extra", "Context", "Source"],
       isCloze: false,
       css: DEFAULT_CSS,
       cardTemplates: [
         {
           Name: "Card 1",
           Front: BASIC_FRONT_TEMPLATE,
-          Back: BASIC_BACK_TEMPLATE,
+          Back: REVERSED_CARD1_BACK_TEMPLATE,
         },
         {
           Name: "Card 2",
@@ -462,11 +472,24 @@ export function renderCardForAnki(
     };
   }
 
-  const modelName =
-    card.kind === "reversed" ? ANKI_MODEL_REVERSED : ANKI_MODEL_BASIC;
+  if (card.kind === "reversed") {
+    return {
+      deckName: ctx.deckName,
+      modelName: ANKI_MODEL_REVERSED,
+      fields: {
+        Front: md(rewrite(card.front)),
+        Back: md(rewrite(card.answer)),
+        Extra: card.extra === undefined ? "" : md(rewrite(card.extra)),
+        Context: context,
+        Source: source,
+      } as RenderedFields,
+      tags: ctx.tags,
+    };
+  }
+
   return {
     deckName: ctx.deckName,
-    modelName,
+    modelName: ANKI_MODEL_BASIC,
     fields: {
       Front: md(rewrite(card.front)),
       Back: md(rewrite(card.answer)),

@@ -4,6 +4,7 @@ import {
   ANKI_MODEL_CLOZE,
   ANKI_MODEL_REMINDER,
   ANKI_MODEL_REVERSED,
+  EXTRA_TEMPLATE,
 } from "../../core/render/render-card.js";
 import type {
   AnkiModelTemplates,
@@ -48,11 +49,14 @@ export async function repairManagedSourceTemplates(
     const fields = await sessionModelFields(client, executionSession, modelName);
     const hasContext = fields.includes("Context");
     const hasSource = fields.includes("Source");
-    if (!hasContext && !hasSource) continue;
+    const hasExtra =
+      modelName === ANKI_MODEL_REVERSED && fields.includes("Extra");
+    if (!hasContext && !hasSource && !hasExtra) continue;
 
     const current = await client.modelTemplates(modelName);
     const repaired = appendMissingManagedTokens(current, {
       context: hasContext,
+      extra: hasExtra,
       source: hasSource,
     });
     if (repaired.updated === 0) continue;
@@ -67,7 +71,7 @@ export async function repairManagedSourceTemplates(
 
 function appendMissingManagedTokens(
   templates: AnkiModelTemplates,
-  fields: { context: boolean; source: boolean },
+  fields: { context: boolean; extra: boolean; source: boolean },
 ): {
   templates: AnkiModelTemplates;
   updated: number;
@@ -90,6 +94,11 @@ function appendMissingManagedTokens(
     }
     if (fields.source && !back.includes(SOURCE_TOKEN)) {
       back = `${back}\n<br><br>${SOURCE_TOKEN}`;
+    }
+    if (fields.extra && !back.includes("{{#Extra}}")) {
+      back = back.includes(SOURCE_TOKEN)
+        ? back.replace(SOURCE_TOKEN, `${EXTRA_TEMPLATE}${SOURCE_TOKEN}`)
+        : `${back}${EXTRA_TEMPLATE}`;
     }
     if (front !== template.Front || back !== template.Back) updated++;
     next[name] = { Back: back, Front: front };

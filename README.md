@@ -157,6 +157,9 @@ type: reversed
 The default `type` is `basic`. Other values are `reversed`, `cloze`, and
 `reminder`. Reminder blocks use `content:` instead of `front:` and `back:`.
 
+A reversed block can add an optional `extra:` field; its text appears on the
+back of both generated cards. See the [v2 wiki](docs/wiki.md) for details.
+
 The plugin also supports card callouts, cards in lists, and atomic note cards.
 See the [v2 wiki](docs/wiki.md) for their exact rules and examples.
 

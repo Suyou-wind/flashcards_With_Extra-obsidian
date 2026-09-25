@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { AnkiConnectClient } from "../../../src/adapters/anki/anki-connect-client.js";
 import { repairManagedSourceTemplates } from "../../../src/adapters/anki/repair-managed-source-templates.js";
-import { ANKI_MODEL_BASIC } from "../../../src/core/render/render-card.js";
+import {
+  ANKI_MODEL_BASIC,
+  ANKI_MODEL_REVERSED,
+  EXTRA_TEMPLATE,
+} from "../../../src/core/render/render-card.js";
 import { makeFakeFetch, ok } from "../../_utils/fake-fetch.js";
 
 describe("repairManagedSourceTemplates", () => {
@@ -94,5 +98,40 @@ describe("repairManagedSourceTemplates", () => {
     expect(templates.Card?.Front).toContain("{{Context}}");
     expect(templates.Card?.Front).toContain(custom.Card.Front);
     expect(templates.Card?.Back).toBe(custom.Card.Back);
+  });
+
+  it("injects the Extra wrapper before Source on the reversed model", async () => {
+    const custom = {
+      "Card 1": {
+        Back: "{{FrontSide}}<hr>{{Back}}<footer>{{Source}}</footer>",
+        Front: "{{Front}}",
+      },
+    };
+    const { calls, fetch } = makeFakeFetch([
+      ok([ANKI_MODEL_REVERSED]),
+      ok(["Front", "Back", "Extra", "Source"]),
+      ok(custom),
+      ok(null),
+    ]);
+
+    const result = await repairManagedSourceTemplates(
+      new AnkiConnectClient({ fetch }),
+    );
+
+    expect(result).toEqual({ modelsUpdated: 1, templatesUpdated: 1 });
+    const update = calls.find(
+      (call) => call.action === "updateModelTemplates",
+    );
+    expect(update?.params).toEqual({
+      model: {
+        name: ANKI_MODEL_REVERSED,
+        templates: {
+          "Card 1": {
+            Back: `{{FrontSide}}<hr>{{Back}}<footer>${EXTRA_TEMPLATE}{{Source}}</footer>`,
+            Front: "{{Front}}",
+          },
+        },
+      },
+    });
   });
 });

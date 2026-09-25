@@ -771,6 +771,7 @@ function stylePlan() {
           templates: { "Card 1": { Back: "new", Front: "new" } },
         },
         missingContext: false,
+        missingExtra: false,
         missingSource: false,
         modelName: "Obsidian-basic",
       },

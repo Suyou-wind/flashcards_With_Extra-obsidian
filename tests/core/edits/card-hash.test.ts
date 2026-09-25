@@ -15,19 +15,20 @@ import type { Flashcard } from "../../../src/core/domain/card.js";
  *
  * Spec (locked by human in the slice brief):
  *   - Algorithm: SHA-256.
- *   - Input bytes: `kind + "\n" + context + "\n" + front + "\n" + back`
- *     (UTF-8). Absent context is empty; front == card.front, back ==
+ *   - Input bytes: `kind + "\n" + context + "\n" + front + "\n" + back + "\n" + extra`
+ *     (UTF-8). Absent context and extra are empty; front == card.front, back ==
  *     card.answer, and kind is the literal CardKind string.
  *   - Output: take the leading 40 bits (5 bytes), encode as 8 base32 chars
  *     using the Crockford-style alphabet `abcdefghijkmnpqrstuvwxyz23456789`
  *     (no `l, o, 0, 1`), MSB-first, lowercase.
  *
  * Reference hashes were computed offline via Node `crypto`:
- *   computeCardHash({kind:"basic",   context:"", front:"hello", back:"world"}) === "w3xt27aj"
- *   computeCardHash({kind:"cloze",   context:"", front:"The ==heart== pumps.", back:""}) === "vtta9m9d"
- *   computeCardHash({kind:"basic",   context:"", front:"Q", back:"A"}) === "39vpcg6v"
- *   computeCardHash({kind:"basic",   context:"", front:"Q", back:"B"}) === "q3tghrv8"
- *   computeCardHash({kind:"reversed",context:"", front:"Q", back:"A"}) === "wtr72t85"
+ *   computeCardHash({kind:"basic",   context:"", front:"hello", back:"world"}) === "hgqzw4ah"
+ *   computeCardHash({kind:"cloze",   context:"", front:"The ==heart== pumps.", back:""}) === "w8d68874"
+ *   computeCardHash({kind:"basic",   context:"", front:"Q", back:"A"}) === "hasyfhh5"
+ *   computeCardHash({kind:"basic",   context:"", front:"Q", back:"B"}) === "xumeyyae"
+ *   computeCardHash({kind:"reversed",context:"", front:"Q", back:"A"}) === "4j5pd8mw"
+ *   computeCardHash({kind:"reversed",context:"", front:"Q", back:"A", extra:"E"}) === "sffddmzd"
  */
 
 const HASH_RE = /^[abcdefghijkmnpqrstuvwxyz23456789]{8}$/;
@@ -71,23 +72,29 @@ describe("computeCardHash — known vectors", () => {
   test("basic / hello / world", () => {
     expect(
       computeCardHash(card({ kind: "basic", front: "hello", answer: "world" })),
-    ).toBe("w3xt27aj");
+    ).toBe("hgqzw4ah");
   });
 
   test("cloze / front-only / empty back", () => {
     expect(
       computeCardHash(card({ kind: "cloze", front: "The ==heart== pumps.", answer: "" })),
-    ).toBe("vtta9m9d");
+    ).toBe("w8d68874");
   });
 
   test("basic / Q / A", () => {
-    expect(computeCardHash(card({ kind: "basic", front: "Q", answer: "A" }))).toBe("39vpcg6v");
+    expect(computeCardHash(card({ kind: "basic", front: "Q", answer: "A" }))).toBe("hasyfhh5");
   });
 
   test("reversed / Q / A", () => {
     expect(
       computeCardHash(card({ kind: "reversed", front: "Q", answer: "A" })),
-    ).toBe("wtr72t85");
+    ).toBe("4j5pd8mw");
+  });
+
+  test("reversed / Q / A / extra", () => {
+    expect(
+      computeCardHash(card({ kind: "reversed", front: "Q", answer: "A", extra: "E" })),
+    ).toBe("sffddmzd");
   });
 });
 
@@ -108,8 +115,8 @@ describe("computeCardHash — sensitivity", () => {
     const b = computeCardHash(card({ front: "Q", answer: "B" }));
     expect(a).not.toBe(b);
     // Cross-check against the locked vector.
-    expect(a).toBe("39vpcg6v");
-    expect(b).toBe("q3tghrv8");
+    expect(a).toBe("hasyfhh5");
+    expect(b).toBe("xumeyyae");
   });
 
   test("different kind → different hash", () => {
@@ -121,6 +128,12 @@ describe("computeCardHash — sensitivity", () => {
   test("different context → different hash", () => {
     const a = computeCardHash(card({ context: "Course", front: "Q" }));
     const b = computeCardHash(card({ context: "Topic", front: "Q" }));
+    expect(a).not.toBe(b);
+  });
+
+  test("different extra → different hash", () => {
+    const a = computeCardHash(card({ kind: "reversed", front: "Q", answer: "A" }));
+    const b = computeCardHash(card({ kind: "reversed", front: "Q", answer: "A", extra: "E" }));
     expect(a).not.toBe(b);
   });
 

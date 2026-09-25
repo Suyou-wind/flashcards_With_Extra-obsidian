@@ -9,6 +9,7 @@ import {
   ANKI_MODEL_CLOZE,
   ANKI_MODEL_REMINDER,
   ANKI_MODEL_REVERSED,
+  EXTRA_TEMPLATE,
   getAnkiModelSpecs,
 } from "../../core/render/render-card.js";
 
@@ -19,18 +20,24 @@ const REQUIRED_MODELS = [
   ANKI_MODEL_REMINDER,
 ];
 const CONTEXT_TOKEN = "{{Context}}";
+const SOURCE_TOKEN = "{{Source}}";
+const EXTRA_TOKEN = "{{#Extra}}";
 
 function extendManagedTemplates(
   templates: Record<string, { Back: string; Front: string }>,
+  includeExtra: boolean,
 ): Record<string, { Back: string; Front: string }> {
   return Object.fromEntries(
     Object.entries(templates).map(([templateName, template]) => {
       const front = template.Front.includes(CONTEXT_TOKEN)
         ? template.Front
         : `${ANKI_CONTEXT_TEMPLATE}${template.Front}`;
-      let back = template.Back.includes("{{Source}}")
+      let back = template.Back.includes(SOURCE_TOKEN)
         ? template.Back
-        : `${template.Back}\n<br><br>{{Source}}`;
+        : `${template.Back}\n<br><br>${SOURCE_TOKEN}`;
+      if (includeExtra && !back.includes(EXTRA_TOKEN)) {
+        back = back.replace(SOURCE_TOKEN, `${EXTRA_TEMPLATE}${SOURCE_TOKEN}`);
+      }
       if (!back.includes(CONTEXT_TOKEN) && !back.includes("{{FrontSide}}")) {
         back = `${ANKI_CONTEXT_TEMPLATE}${back}`;
       }
@@ -91,10 +98,15 @@ async function bootstrapManagedModels(
     const fields = await sessionModelFields(client, session, name);
     const missingContext = !fields.includes("Context");
     const missingSource = !fields.includes("Source");
-    if (!missingContext && !missingSource) {
+    const missingExtra =
+      name === ANKI_MODEL_REVERSED && !fields.includes("Extra");
+    if (!missingContext && !missingSource && !missingExtra) {
       if (session.modelsNeedingTemplateRepair?.has(name) === true) {
         const templates = await client.modelTemplates(name);
-        await client.updateModelTemplates(name, extendManagedTemplates(templates));
+        await client.updateModelTemplates(
+          name,
+          extendManagedTemplates(templates, name === ANKI_MODEL_REVERSED),
+        );
         session.modelsNeedingTemplateRepair.delete(name);
       }
       logger.debug("bootstrap: model already v2-shaped", { model: name });
@@ -105,10 +117,17 @@ async function bootstrapManagedModels(
       model: name,
       existingFields: fields,
       missingContext,
+      missingExtra,
       missingSource,
     });
     const templates = await client.modelTemplates(name);
     const nextFields = [...fields];
+    if (missingExtra) {
+      const backIndex = nextFields.indexOf("Back");
+      const extraIndex = backIndex === -1 ? nextFields.length : backIndex + 1;
+      await client.modelFieldAdd(name, "Extra", extraIndex);
+      nextFields.splice(extraIndex, 0, "Extra");
+    }
     if (missingContext) {
       const sourceIndex = nextFields.indexOf("Source");
       const contextIndex = sourceIndex === -1 ? nextFields.length : sourceIndex;
@@ -122,7 +141,10 @@ async function bootstrapManagedModels(
     session.modelFields?.set(name, Promise.resolve(nextFields));
     session.modelsNeedingTemplateRepair ??= new Set();
     session.modelsNeedingTemplateRepair.add(name);
-    await client.updateModelTemplates(name, extendManagedTemplates(templates));
+    await client.updateModelTemplates(
+      name,
+      extendManagedTemplates(templates, name === ANKI_MODEL_REVERSED),
+    );
     session.modelsNeedingTemplateRepair.delete(name);
   }
 }

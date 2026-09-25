@@ -217,6 +217,7 @@ class CountingAnkiGateway implements AnkiGateway {
     this.ankiRequests++;
     if (modelName === ANKI_MODEL_CLOZE) return ["Text", "Extra", "Context", "Source"];
     if (modelName === ANKI_MODEL_REMINDER) return ["Content", "Context", "Source"];
+    if (modelName === ANKI_MODEL_REVERSED) return ["Front", "Back", "Extra", "Context", "Source"];
     return ["Front", "Back", "Context", "Source"];
   }
 

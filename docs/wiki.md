@@ -155,6 +155,23 @@ optional and defaults to `basic`. Use `type: reversed` for a reversed note.
 For an explicit cloze card, use `type: cloze`. `front` becomes Anki's `Text`
 field. `back` is optional and becomes Anki's `Extra` field.
 
+A reversed fenced card can add an optional `extra:` field. Its text appears on
+the back of both generated cards, below the answer:
+
+````markdown
+```flashcard
+front: TCP
+back: Transmission Control Protocol
+type: reversed
+extra: Connection-oriented, reliable, ordered delivery over IP.
+```
+````
+
+`extra:` is recognised only on reversed cards. On other types it is ignored
+with a warning; an empty `extra:` is treated as absent. It supports the same
+multi-line rules as `front:` and `back:`. This mirrors yanki's optional
+"extra" content, while still allowing many cards per file.
+
 ### Hashtag card
 
 ```markdown
